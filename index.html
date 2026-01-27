@@ -27,6 +27,53 @@
     <script type="text/babel">
       const { useState, useEffect, useRef } = React;
 
+      // ======================================================================
+      // CONFIGURAÇÃO DE HOSPEDAGEM EXTERNA (GitHub / Vercel / Netlify)
+      // Cole a URL do seu Web App do Google Apps Script (terminada em /exec) aqui:
+      const API_URL = "https://script.google.com/macros/s/AKfycbz7poveyTAAUUdqi1fWEgGTE3eRXWqizE3n5Dx0fMkkMdAsWp-Q_PYrSh7EzO07dXydVA/exec"; 
+      // ======================================================================
+
+      // Conector para substituir o google.script.run quando hospedado fora
+      const ExternalBridge = {
+        request: async (action, payload = {}) => {
+          if (!API_URL.startsWith('http')) {
+            alert("ERRO DE CONFIGURAÇÃO: Você precisa editar o arquivo index.html e colocar a URL do seu script na variável API_URL.");
+            throw new Error("URL não configurada");
+          }
+          // Usamos POST text/plain para evitar CORS Preflight complexo
+          const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action, ...payload })
+          });
+          const json = await response.json();
+          // O Google às vezes retorna erro dentro do JSON
+          if (json.error) throw new Error(json.error);
+          return json;
+        }
+      };
+
+      // Polyfill do ambiente Google para funcionar na Web Aberta
+      if (typeof google === 'undefined') {
+        window.google = {
+          script: {
+            run: {
+              withSuccessHandler: (success) => ({
+                withFailureHandler: (failure) => ({
+                  getBolsistaInfo: (id, token) => ExternalBridge.request('getBolsistaInfo', { id, token }).then(success).catch(failure),
+                  registrarPonto: (payload) => ExternalBridge.request('registrarPonto', payload).then(success).catch(failure)
+                })
+              })
+            },
+            url: {
+              getLocation: (cb) => {
+                const urlParams = new URLSearchParams(window.location.search);
+                cb({ parameter: { id: urlParams.get('id'), token: urlParams.get('token') } });
+              }
+            }
+          }
+        };
+      }
+
       // Ícones
       const Icon = {
         Map: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
@@ -36,23 +83,6 @@
         Bell: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>,
         Alert: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
       };
-
-      // Mock para desenvolvimento local
-      if (typeof google === 'undefined') {
-        window.google = { 
-          script: { 
-            run: { 
-              withSuccessHandler: (cb) => ({ 
-                withFailureHandler: () => ({ 
-                  registrarPonto: (p) => setTimeout(() => cb({ok:true, timestamp:'2024-01-01 12:00:00', status:'Normal', id:123}), 1500),
-                  getBolsistaInfo: (id, t) => setTimeout(() => cb({nome: 'Bolsista Mock', entryTime: null, lastAction: null, horasDia: 4}), 500)
-                })
-              }) 
-            },
-            url: { getLocation: (cb) => cb({parameter:{id:'TESTE',token:'123'}}) } 
-          } 
-        };
-      }
 
       function TimeClock() {
         const [params, setParams] = useState(null);
@@ -134,7 +164,7 @@
           );
         };
 
-        // --- LÓGICA DE NOTIFICAÇÃO (Versão 3.8 - Padrão Nativo) ---
+        // --- LÓGICA DE NOTIFICAÇÃO (Versão GitHub - Nativa) ---
         const startTitleBlink = (msg) => {
           if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
           let isOriginal = false;
@@ -146,7 +176,6 @@
             isOriginal = !isOriginal;
           }, 1000);
 
-          // Para de piscar ao mover o mouse ou tocar na tela
           const stopBlink = () => {
             clearInterval(titleIntervalRef.current);
             document.title = originalTitle;
@@ -158,10 +187,7 @@
         };
 
         const playAlert = () => {
-          // 1. Vibração (Mobile)
           if (navigator.vibrate) navigator.vibrate([800, 300, 800, 300, 1000]);
-          
-          // 2. Som (Beep)
           try {
             const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
             audio.volume = 1.0;
@@ -171,14 +197,13 @@
 
         const triggerAppAlert = (title, body) => {
            const now = Date.now();
-           // Evita repetir a mesma notificação em menos de 5 min
            if (lastNotifRef.current && lastNotifRef.current.body === body && (now - lastNotifRef.current.time < 300000)) return;
 
            playAlert();
            startTitleBlink(`⚠️ ${title}`); // Pisca a aba
            lastNotifRef.current = { body, time: now };
 
-           // Tenta notificação nativa
+           // Tenta notificação nativa (Funcionará no GitHub)
            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
              try { 
                 const notif = new Notification(title, { 
@@ -189,10 +214,9 @@
                 });
                 notif.onclick = () => window.focus();
              } 
-             catch(e) { console.log("Erro ao exibir notificação nativa."); }
+             catch(e) { console.log("Erro notif:", e); }
            }
 
-           // Alerta Visual Interno (Sempre exibe)
            setActiveAlert({ title, body });
            setTimeout(() => setActiveAlert(null), 15000); 
         };
@@ -205,28 +229,23 @@
           const currentMins = now.getMinutes();
           const totalCurrentMins = currentHours * 60 + currentMins;
 
-          // Parse Horário Configurado de Entrada
           if(!notifConfig.entryTimeStr) return;
           const [confH, confM] = notifConfig.entryTimeStr.split(':').map(Number);
           const totalConfigMins = confH * 60 + confM;
           
-          // 1. Lembrete Antecipado
           const reminderThreshold = totalConfigMins - notifConfig.reminderMins;
           if (!lastAction && totalCurrentMins === reminderThreshold) {
              triggerAppAlert("LEMBRETE PONTO", `Faltam ${notifConfig.reminderMins} minutos.`);
           }
 
-          // 2. Atraso (5 min após horário)
           if (!lastAction && totalCurrentMins >= totalConfigMins + 5 && totalCurrentMins < totalConfigMins + 10) {
              triggerAppAlert("REGISTRO PENDENTE", "Passaram 5 minutos do horário!");
           }
 
-          // 3. Meta de Saída
           if (entryTime && lastAction !== 'Saida') {
              const [entryH, entryM] = entryTime.split(':').map(Number);
              const entryTotal = entryH * 60 + entryM;
              const workedMins = totalCurrentMins - entryTotal; 
-             
              const targetMins = targetHours * 60;
              if (workedMins >= targetMins && workedMins < targetMins + 5) { 
                 triggerAppAlert("META ATINGIDA", `Você completou ${targetHours} horas.`);
@@ -240,21 +259,15 @@
             return;
           }
 
-          // --- PEDIDO PADRÃO DE PERMISSÃO (Igual WhatsApp) ---
           Notification.requestPermission().then((permission) => {
             if (permission === "granted") {
               setNotifConfig(prev => ({...prev, enabled: true}));
               playAlert();
-              try {
-                new Notification("PontoWeb Ativado", { body: "As notificações de sistema estão ativas!", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png' });
-              } catch(e) { /* Ignore iframe error */ }
-              alert("Sucesso! Notificações de sistema permitidas.");
+              new Notification("PontoWeb Ativado", { body: "Notificações ativas! Você receberá avisos na barra do celular.", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png' });
             } else if (permission === "denied") {
-              alert("Você bloqueou as notificações anteriormente. \n\nPara ativar: \n1. Clique no ícone de cadeado 🔒 ou configurações na barra de endereço. \n2. Procure por 'Notificações'. \n3. Altere para 'Permitir'.");
-              // Fallback para modo interno mesmo bloqueado
+              alert("Você bloqueou as notificações. Desbloqueie nas configurações do navegador (ícone de cadeado).");
               setNotifConfig(prev => ({...prev, enabled: true})); 
             } else {
-               // Usuário fechou o prompt
                setNotifConfig(prev => ({...prev, enabled: true}));
             }
           });
