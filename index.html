@@ -30,7 +30,7 @@
       // ======================================================================
       // CONFIGURAÇÃO DE HOSPEDAGEM EXTERNA (GitHub / Vercel / Netlify)
       // Cole a URL do seu Web App do Google Apps Script (terminada em /exec) aqui:
-      const API_URL = "https://script.google.com/macros/s/AKfycbz7poveyTAAUUdqi1fWEgGTE3eRXWqizE3n5Dx0fMkkMdAsWp-Q_PYrSh7EzO07dXydVA/exec"; 
+      const API_URL = "COLE_SUA_URL_DO_APPS_SCRIPT_AQUI"; 
       // ======================================================================
 
       // Conector para substituir o google.script.run quando hospedado fora
@@ -52,26 +52,18 @@
         }
       };
 
-      // Polyfill do ambiente Google para funcionar na Web Aberta
+      // Polyfill CORRIGIDO para ambiente externo
       if (typeof google === 'undefined') {
-        window.google = {
-          script: {
-            run: {
-              withSuccessHandler: (success) => ({
-                withFailureHandler: (failure) => ({
-                  getBolsistaInfo: (id, token) => ExternalBridge.request('getBolsistaInfo', { id, token }).then(success).catch(failure),
-                  registrarPonto: (payload) => ExternalBridge.request('registrarPonto', payload).then(success).catch(failure)
-                })
-              })
-            },
-            url: {
-              getLocation: (cb) => {
-                const urlParams = new URLSearchParams(window.location.search);
-                cb({ parameter: { id: urlParams.get('id'), token: urlParams.get('token') } });
-              }
-            }
-          }
+        const createRunner = (success, failure) => {
+          return {
+            withSuccessHandler: (fn) => createRunner(fn, failure),
+            withFailureHandler: (fn) => createRunner(success, fn),
+            // As funções ficam disponíveis IMEDIATAMENTE (sem nesting)
+            getBolsistaInfo: (id, token) => ExternalBridge.request('getBolsistaInfo', { id, token }).then(success).catch(failure || console.error),
+            registrarPonto: (payload) => ExternalBridge.request('registrarPonto', payload).then(success).catch(failure || console.error)
+          };
         };
+        window.google = { script: { run: createRunner() } };
       }
 
       // Ícones
@@ -394,7 +386,7 @@
                  <div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div>
                  <span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span>
                </div>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 3.8 (Native Standard)</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 3.9 (Polyfill Fix)</div>
             </div>
 
             {/* MODAL CONFIGURAÇÕES */}
