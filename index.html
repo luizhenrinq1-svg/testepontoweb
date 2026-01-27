@@ -17,7 +17,6 @@
       @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
       .slide-down { animation: slideDown 0.5s ease-out forwards; }
       @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-      /* Animação para o sino */
       .bell-shake { animation: shake 2s infinite; transform-origin: top center; }
       @keyframes shake { 0% { transform: rotate(0deg); } 10% { transform: rotate(10deg); } 20% { transform: rotate(-10deg); } 30% { transform: rotate(6deg); } 40% { transform: rotate(-6deg); } 50% { transform: rotate(0deg); } 100% { transform: rotate(0deg); } }
     </style>
@@ -37,16 +36,14 @@
       const ExternalBridge = {
         request: async (action, payload = {}) => {
           if (!API_URL.startsWith('http')) {
-            alert("ERRO DE CONFIGURAÇÃO: Você precisa editar o arquivo index.html e colocar a URL do seu script na variável API_URL.");
+            alert("ERRO DE CONFIGURAÇÃO: Edite o index.html e coloque a URL do Apps Script na variável API_URL.");
             throw new Error("URL não configurada");
           }
-          // Usamos POST text/plain para evitar CORS Preflight complexo
           const response = await fetch(API_URL, {
             method: 'POST',
             body: JSON.stringify({ action, ...payload })
           });
           const json = await response.json();
-          // O Google às vezes retorna erro dentro do JSON
           if (json.error) throw new Error(json.error);
           return json;
         }
@@ -58,7 +55,6 @@
           return {
             withSuccessHandler: (fn) => createRunner(fn, failure),
             withFailureHandler: (fn) => createRunner(success, fn),
-            // As funções ficam disponíveis IMEDIATAMENTE (sem nesting)
             getBolsistaInfo: (id, token) => ExternalBridge.request('getBolsistaInfo', { id, token }).then(success).catch(failure || console.error),
             registrarPonto: (payload) => ExternalBridge.request('registrarPonto', payload).then(success).catch(failure || console.error)
           };
@@ -87,6 +83,7 @@
         const [punchType, setPunchType] = useState(null);
         const [result, setResult] = useState(null);
         const [currentTime, setCurrentTime] = useState(new Date()); 
+        const [swRegistration, setSwRegistration] = useState(null);
         
         // Estado das Notificações
         const [settingsOpen, setSettingsOpen] = useState(false);
@@ -99,38 +96,60 @@
 
         const videoRef = useRef(null);
         const lastNotifRef = useRef(null); 
-        const titleIntervalRef = useRef(null); // Para piscar o título
-        const wakeLockRef = useRef(null); // Para manter a tela ativa se possível
+        const titleIntervalRef = useRef(null);
+        const wakeLockRef = useRef(null);
 
-        // Carregar configurações locais
+        // --- INICIALIZAÇÃO E SERVICE WORKER VIRTUAL ---
         useEffect(() => {
           const saved = localStorage.getItem('pontoWebConfig');
-          if (saved) setNotifConfig(prev => ({...prev, ...JSON.parse(saved)}));
-          
-          // Tenta ativar Wake Lock se notificações estiverem ativas
-          if (saved && JSON.parse(saved).enabled) requestWakeLock();
+          if (saved) {
+            const config = JSON.parse(saved);
+            setNotifConfig(prev => ({...prev, ...config}));
+            if(config.enabled) requestWakeLock();
+          }
+
+          // Registrar Service Worker (Necessário para barra de status no Android)
+          if ('serviceWorker' in navigator) {
+             const swCode = `
+               self.addEventListener('notificationclick', function(event) {
+                 event.notification.close();
+                 event.waitUntil(
+                   clients.matchAll({type: 'window', includeUncontrolled: true}).then(function(clientList) {
+                     for (var i = 0; i < clientList.length; i++) {
+                       var client = clientList[i];
+                       if (client.url && 'focus' in client) { return client.focus(); }
+                     }
+                     if (clients.openWindow) { return clients.openWindow('/'); }
+                   })
+                 );
+               });
+             `;
+             const blob = new Blob([swCode], {type: 'text/javascript'});
+             const blobUrl = URL.createObjectURL(blob);
+             
+             navigator.serviceWorker.register(blobUrl)
+               .then(reg => {
+                 console.log('SW Registrado:', reg);
+                 setSwRegistration(reg);
+               })
+               .catch(err => console.log('SW Falha:', err));
+          }
         }, []);
 
-        // Relógio e Verificador de Notificações
         useEffect(() => {
           const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-          const notifTimer = setInterval(checkNotifications, 15000); // Verifica a cada 15s
+          const notifTimer = setInterval(checkNotifications, 15000); 
           return () => { clearInterval(timer); clearInterval(notifTimer); releaseWakeLock(); };
-        }, [notifConfig, entryTime, lastAction, targetHours]);
+        }, [notifConfig, entryTime, lastAction, targetHours, swRegistration]);
 
         const requestWakeLock = async () => {
           if ('wakeLock' in navigator) {
-            try {
-              wakeLockRef.current = await navigator.wakeLock.request('screen');
-            } catch (err) { console.log('Wake Lock error:', err); }
+            try { wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch (err) {}
           }
         };
 
         const releaseWakeLock = () => {
-          if (wakeLockRef.current) {
-            wakeLockRef.current.release();
-            wakeLockRef.current = null;
-          }
+          if (wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; }
         };
 
         useEffect(() => {
@@ -148,11 +167,7 @@
             const u = new URLSearchParams(window.location.search);
             const id = u.get('id');
             const token = u.get('token');
-            if(id && token) { 
-              setParams({ id, token }); 
-              loadBolsista(id, token);
-              initGPS(); 
-            } else setStatus('no-link');
+            if(id && token) { setParams({ id, token }); loadBolsista(id, token); initGPS(); } else setStatus('no-link');
           }
         }, []);
 
@@ -175,18 +190,16 @@
           );
         };
 
-        // --- LÓGICA DE NOTIFICAÇÃO (Versão GitHub - Nativa Melhorada) ---
+        // --- SISTEMA DE NOTIFICAÇÃO 4.0 (Service Worker Push) ---
         const startTitleBlink = (msg) => {
           if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
           let isOriginal = false;
           const originalTitle = "Bater Ponto";
           document.title = msg;
-          
           titleIntervalRef.current = setInterval(() => {
             document.title = isOriginal ? msg : "🔔 🔔 🔔";
             isOriginal = !isOriginal;
           }, 1000);
-
           const stopBlink = () => {
             clearInterval(titleIntervalRef.current);
             document.title = originalTitle;
@@ -208,36 +221,40 @@
 
         const triggerAppAlert = (title, body) => {
            const now = Date.now();
-           // No modo teste (body = 'Teste'), ignora o debounce de tempo
            if (body !== 'Teste de Notificação' && lastNotifRef.current && lastNotifRef.current.body === body && (now - lastNotifRef.current.time < 300000)) return;
 
            playAlert();
-           startTitleBlink(`⚠️ ${title}`); // Pisca a aba
+           startTitleBlink(`⚠️ ${title}`);
            lastNotifRef.current = { body, time: now };
 
-           // Tenta notificação nativa (Funcionará no GitHub)
-           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-             try { 
-                const notif = new Notification(title, { 
-                    body, 
-                    icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png',
-                    tag: 'pontoweb-alert',
-                    renotify: true, // Força vibrar de novo se já existir
-                    requireInteraction: true, // Tenta manter na tela
-                    vibrate: [300, 100, 400] 
+           // TENTA USAR O SERVICE WORKER (Melhor para Android)
+           if (Notification.permission === 'granted' && swRegistration) {
+              try {
+                swRegistration.showNotification(title, {
+                  body: body,
+                  icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png',
+                  vibrate: [300, 100, 400],
+                  tag: 'pontoweb-alert',
+                  renotify: true, // Força vibrar de novo
+                  requireInteraction: true // Força ficar na tela
                 });
-                notif.onclick = () => window.focus();
-             } 
-             catch(e) { console.log("Erro notif:", e); }
+              } catch(e) { console.log('Erro SW Notif:', e); fallbackNotification(title, body); }
+           } else {
+             fallbackNotification(title, body);
            }
 
            setActiveAlert({ title, body });
            setTimeout(() => setActiveAlert(null), 15000); 
         };
 
+        const fallbackNotification = (title, body) => {
+           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+             try { new Notification(title, { body, icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png' }); } catch(e){}
+           }
+        };
+
         const checkNotifications = () => {
           if (!notifConfig.enabled || !targetHours) return;
-
           const now = new Date();
           const currentHours = now.getHours();
           const currentMins = now.getMinutes();
@@ -251,11 +268,9 @@
           if (!lastAction && totalCurrentMins === reminderThreshold) {
              triggerAppAlert("LEMBRETE PONTO", `Faltam ${notifConfig.reminderMins} minutos.`);
           }
-
           if (!lastAction && totalCurrentMins >= totalConfigMins + 5 && totalCurrentMins < totalConfigMins + 10) {
              triggerAppAlert("REGISTRO PENDENTE", "Passaram 5 minutos do horário!");
           }
-
           if (entryTime && lastAction !== 'Saida') {
              const [entryH, entryM] = entryTime.split(':').map(Number);
              const entryTotal = entryH * 60 + entryM;
@@ -268,22 +283,21 @@
         };
 
         const enableAlerts = () => {
-          if (!("Notification" in window)) {
-            alert("Este navegador não suporta notificações de sistema.");
-            return;
-          }
-
+          if (!("Notification" in window)) { alert("Navegador sem suporte."); return; }
           Notification.requestPermission().then((permission) => {
             if (permission === "granted") {
               setNotifConfig(prev => ({...prev, enabled: true}));
-              requestWakeLock(); // Pede para manter tela ativa
+              requestWakeLock();
               playAlert();
-              new Notification("PontoWeb Ativado", { body: "Notificações ativas! Você receberá avisos na barra do celular.", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png' });
-            } else if (permission === "denied") {
-              alert("Você bloqueou as notificações. Desbloqueie nas configurações do navegador (ícone de cadeado).");
-              setNotifConfig(prev => ({...prev, enabled: true})); 
+              // Teste Imediato com SW se disponível
+              if(swRegistration) {
+                 swRegistration.showNotification("PontoWeb", { body: "Notificações de Barra Ativadas!", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', vibrate: [200,100,200] });
+              } else {
+                 new Notification("PontoWeb", { body: "Notificações Ativadas!" });
+              }
             } else {
-               setNotifConfig(prev => ({...prev, enabled: true}));
+              alert("Notificações bloqueadas. Verifique as configurações do navegador.");
+              setNotifConfig(prev => ({...prev, enabled: true})); // Ativa modo interno
             }
           });
         };
@@ -414,7 +428,7 @@
                  <div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div>
                  <span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span>
                </div>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 3.9.5 (WakeLock + Teste)</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.0 (Service Worker Mode)</div>
             </div>
 
             {/* MODAL CONFIGURAÇÕES */}
