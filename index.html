@@ -1,16 +1,23 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
   <head>
-    <base target="_top">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bater Ponto</title>
+    <title>PontoWeb</title>
+    
+    <!-- Configurações PWA (Necessário para Instalar) -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#166534">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2983/2983818.png">
+
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      body { background-color: #f0fdf4; color: #166534; font-family: sans-serif; }
+      body { background-color: #f0fdf4; color: #166534; font-family: sans-serif; user-select: none; }
       .spinner { border: 4px solid #dcfce7; width: 40px; height: 40px; border-radius: 50%; border-left-color: #16a34a; animation: spin 1s linear infinite; }
       @keyframes spin { 100% { transform: rotate(360deg); } }
       .fade-in { animation: fadeIn 0.3s ease-in; }
@@ -32,11 +39,10 @@
       const API_URL = "https://script.google.com/macros/s/AKfycbz7poveyTAAUUdqi1fWEgGTE3eRXWqizE3n5Dx0fMkkMdAsWp-Q_PYrSh7EzO07dXydVA/exec"; 
       // ======================================================================
 
-      // Conector para substituir o google.script.run quando hospedado fora
       const ExternalBridge = {
         request: async (action, payload = {}) => {
           if (!API_URL.startsWith('http')) {
-            alert("ERRO DE CONFIGURAÇÃO: Edite o index.html e coloque a URL do Apps Script na variável API_URL.");
+            alert("ERRO: Configure a API_URL no código.");
             throw new Error("URL não configurada");
           }
           const response = await fetch(API_URL, {
@@ -49,7 +55,6 @@
         }
       };
 
-      // Polyfill CORRIGIDO para ambiente externo
       if (typeof google === 'undefined') {
         const createRunner = (success, failure) => {
           return {
@@ -62,12 +67,10 @@
         window.google = { script: { run: createRunner() } };
       }
 
-      // Ícones
       const Icon = {
         Map: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
         Camera: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
         Check: () => <svg className="w-16 h-16 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
-        Lock: () => <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>,
         Bell: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>,
         Alert: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
       };
@@ -83,9 +86,8 @@
         const [punchType, setPunchType] = useState(null);
         const [result, setResult] = useState(null);
         const [currentTime, setCurrentTime] = useState(new Date()); 
-        const [swRegistration, setSwRegistration] = useState(null);
         
-        // Estado das Notificações
+        // Estado das Notificações & PWA
         const [settingsOpen, setSettingsOpen] = useState(false);
         const [notifConfig, setNotifConfig] = useState({
           enabled: false,
@@ -93,14 +95,17 @@
           reminderMins: 10
         });
         const [activeAlert, setActiveAlert] = useState(null);
+        const [swRegistration, setSwRegistration] = useState(null);
+        const [installPrompt, setInstallPrompt] = useState(null); // Estado para o botão de instalação
 
         const videoRef = useRef(null);
         const lastNotifRef = useRef(null); 
         const titleIntervalRef = useRef(null);
         const wakeLockRef = useRef(null);
 
-        // --- INICIALIZAÇÃO E SERVICE WORKER VIRTUAL ---
+        // --- INICIALIZAÇÃO E SERVICE WORKER ---
         useEffect(() => {
+          // 1. Tenta recuperar Configurações
           const saved = localStorage.getItem('pontoWebConfig');
           if (saved) {
             const config = JSON.parse(saved);
@@ -108,32 +113,21 @@
             if(config.enabled) requestWakeLock();
           }
 
-          // Registrar Service Worker (Necessário para barra de status no Android)
+          // 2. Registrar Service Worker (Real do GitHub)
           if ('serviceWorker' in navigator) {
-             const swCode = `
-               self.addEventListener('notificationclick', function(event) {
-                 event.notification.close();
-                 event.waitUntil(
-                   clients.matchAll({type: 'window', includeUncontrolled: true}).then(function(clientList) {
-                     for (var i = 0; i < clientList.length; i++) {
-                       var client = clientList[i];
-                       if (client.url && 'focus' in client) { return client.focus(); }
-                     }
-                     if (clients.openWindow) { return clients.openWindow('/'); }
-                   })
-                 );
-               });
-             `;
-             const blob = new Blob([swCode], {type: 'text/javascript'});
-             const blobUrl = URL.createObjectURL(blob);
-             
-             navigator.serviceWorker.register(blobUrl)
+             navigator.serviceWorker.register('./sw.js')
                .then(reg => {
                  console.log('SW Registrado:', reg);
                  setSwRegistration(reg);
                })
                .catch(err => console.log('SW Falha:', err));
           }
+
+          // 3. Capturar evento de instalação do PWA
+          window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault(); // Impede o mini-infobar automático
+            setInstallPrompt(e); // Guarda o evento para usar no botão
+          });
         }, []);
 
         useEffect(() => {
@@ -152,43 +146,38 @@
           if (wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; }
         };
 
+        // --- DATA LOADING & PERSISTÊNCIA (Login Automático) ---
         useEffect(() => {
-          try {
-            google.script.url.getLocation((loc) => {
-              const id = loc.parameter.id;
-              const token = loc.parameter.token;
-              if (id && token) {
-                setParams({ id, token });
-                loadBolsista(id, token);
-                initGPS();
-              } else setStatus('no-link');
-            });
-          } catch(e) {
-            const u = new URLSearchParams(window.location.search);
-            const id = u.get('id');
-            const token = u.get('token');
-            if(id && token) { setParams({ id, token }); loadBolsista(id, token); initGPS(); } else setStatus('no-link');
+          const u = new URLSearchParams(window.location.search);
+          let id = u.get('id');
+          let token = u.get('token');
+
+          // Salva ou Recupera Credenciais
+          if (id && token) {
+             localStorage.setItem('ponto_auth_data', JSON.stringify({ id, token }));
+          } else {
+             const savedAuth = localStorage.getItem('ponto_auth_data');
+             if (savedAuth) {
+                const auth = JSON.parse(savedAuth);
+                id = auth.id;
+                token = auth.token;
+             }
+          }
+
+          if (id && token) {
+            setParams({ id, token });
+            google.script.run.withSuccessHandler(res => {
+               if(res.nome) setBolsistaName(res.nome);
+               if(res.entryTime) setEntryTime(res.entryTime);
+               if(res.lastAction) setLastAction(res.lastAction);
+               if(res.horasDia) setTargetHours(Number(res.horasDia));
+               setStatus('ready');
+            }).getBolsistaInfo(id, token);
+            navigator.geolocation.getCurrentPosition(p => setLocation(p.coords), () => {}, {enableHighAccuracy:true});
+          } else {
+             setStatus('no-link');
           }
         }, []);
-
-        const loadBolsista = (id, token) => {
-           google.script.run.withSuccessHandler(res => {
-             if(res.nome) setBolsistaName(res.nome);
-             if(res.entryTime) setEntryTime(res.entryTime);
-             if(res.lastAction) setLastAction(res.lastAction);
-             if(res.horasDia) setTargetHours(Number(res.horasDia));
-           }).getBolsistaInfo(id, token);
-        };
-
-        const initGPS = () => {
-          if (!navigator.geolocation) { setStatus('error'); return; }
-          setStatus('locating');
-          navigator.geolocation.getCurrentPosition(
-            (pos) => { setLocation(pos.coords); setStatus('ready'); },
-            () => setStatus('error'),
-            { enableHighAccuracy: true }
-          );
-        };
 
         // --- SISTEMA DE NOTIFICAÇÃO 4.0 (Service Worker Push) ---
         const startTitleBlink = (msg) => {
@@ -302,6 +291,15 @@
           });
         };
 
+        const installPWA = () => {
+           if(installPrompt) {
+              installPrompt.prompt();
+              installPrompt.userChoice.then(res => setInstallPrompt(null));
+           } else {
+              alert("Para instalar: Abra o menu do navegador e procure por 'Adicionar à Tela Inicial' ou 'Instalar Aplicativo'.");
+           }
+        };
+
         const testNotification = () => {
            triggerAppAlert("Teste PontoWeb", "Teste de Notificação");
         };
@@ -358,17 +356,15 @@
             .registrarPonto(payload);
         };
 
-        // Telas de Status
+        // Telas
         if (status === 'no-link') return <div className="h-screen flex items-center justify-center p-4 text-center"><div><h1 className="text-xl font-bold text-red-600">Link Inválido</h1><p className="text-gray-600 mt-2">Use o link fornecido pelo gestor.</p></div></div>;
         if (status === 'success') return <div className="h-screen flex flex-col items-center justify-center bg-white p-6 text-center fade-in"><Icon.Check /><h2 className="text-2xl font-bold mt-4 text-green-700">Ponto Registrado!</h2><p className="text-4xl font-bold mt-2 text-gray-800">{result.timestamp.split(' ')[1]}</p><p className="text-gray-500 mt-1">{result.status}</p><button onClick={resetState} className="mt-10 px-8 py-3 bg-green-50 text-green-700 font-bold rounded-full hover:bg-green-100 shadow-sm">Voltar</button></div>;
         if (status === 'punching') return <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50 fade-in"><video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover opacity-80"></video><div className="absolute bottom-10 w-full px-6 flex gap-4"><button onClick={() => { if(videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t=>t.stop()); setStatus('ready'); }} className="flex-1 bg-white text-black py-4 rounded-xl font-bold shadow-lg">Cancelar</button><button onClick={confirm} className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 active:scale-95 transition-transform"><Icon.Camera/> Confirmar</button></div><div className="absolute top-10 text-white font-bold text-xl drop-shadow-md bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">A registar {punchType}</div></div>;
 
-        const isEntryBlocked = lastAction === 'Entrada' || lastAction === 'Intervalo-Fim'; 
-
         return (
           <div className="min-h-screen max-w-md mx-auto bg-white shadow-xl flex flex-col relative">
             
-            {/* --- ALERTA VISUAL (TOAST) --- */}
+            {/* ALERTA VISUAL */}
             {activeAlert && (
               <div className="fixed top-0 left-0 right-0 z-[100] p-4 slide-down">
                 <div className="bg-white border-l-4 border-orange-500 shadow-2xl rounded-lg p-4 flex items-start gap-3">
@@ -384,14 +380,21 @@
 
             <div className="bg-green-600 p-6 text-white text-center rounded-b-3xl shadow-lg z-10 transition-all relative">
               
+              {/* BOTÃO INSTALAR PWA (Restaurado e Corrigido) */}
+              <div className="absolute top-4 left-4 cursor-pointer z-20" onClick={installPWA}>
+                 <div className="bg-green-700/50 p-2 rounded-full text-xs flex items-center gap-1 hover:bg-green-500 transition-colors border border-green-500/30">
+                   <span>📲</span> {installPrompt ? 'Instalar App' : 'App PWA'}
+                 </div>
+              </div>
+
               {/* Botão Configurações */}
               <button onClick={() => setSettingsOpen(true)} className={`absolute top-4 right-4 text-green-100 hover:text-white bg-green-700/50 p-2 rounded-full ${notifConfig.enabled ? 'bell-shake' : ''}`}>
                  <Icon.Bell />
                  {notifConfig.enabled && <span className="absolute top-0 right-0 w-3 h-3 bg-red-400 rounded-full border-2 border-green-600"></span>}
               </button>
 
-              <h1 className="text-2xl font-bold">PontoWeb Unespar</h1>
-              <div className="flex flex-col items-center mt-2 mb-1">
+              <h1 className="text-2xl font-bold mt-2">PontoWeb Unespar</h1>
+              <div className="flex flex-col items-center mt-1 mb-1">
                 <span className="text-4xl font-mono font-bold tracking-widest drop-shadow-md">
                   {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
@@ -413,10 +416,12 @@
                 {entryTime && <div className="mt-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-bold inline-block">Entrada às: {entryTime}</div>}
               </div>
               
-              <button disabled={status!=='ready' || isEntryBlocked} onClick={() => startCamera('Entrada')} className="bg-green-50 text-green-700 border-2 border-green-200 p-5 rounded-2xl font-bold text-xl hover:bg-green-100 hover:border-green-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 shadow-sm">
-                {isEntryBlocked ? 'ENTRADA (Registrada)' : 'ENTRADA'}
+              <button disabled={status!=='ready'} onClick={() => startCamera('Entrada')} className="bg-green-50 text-green-700 border-2 border-green-200 p-5 rounded-2xl font-bold text-xl hover:bg-green-100 hover:border-green-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 shadow-sm">
+                ENTRADA
               </button>
-              <button disabled={status!=='ready'} onClick={() => startCamera('Saida')} className="bg-red-50 text-red-700 border-2 border-red-200 p-5 rounded-2xl font-bold text-xl hover:bg-red-100 hover:border-red-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 shadow-sm">SAÍDA</button>
+              <button disabled={status!=='ready'} onClick={() => startCamera('Saida')} className="bg-red-50 text-red-700 border-2 border-red-200 p-5 rounded-2xl font-bold text-xl hover:bg-red-100 hover:border-red-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 shadow-sm">
+                SAÍDA
+              </button>
               <div className="grid grid-cols-2 gap-4 mt-2">
                 <button disabled={status!=='ready'} onClick={() => startCamera('Intervalo-Inicio')} className="bg-gray-50 text-gray-700 p-4 rounded-xl font-bold border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-100 active:scale-95 disabled:opacity-50">Início Interv.</button>
                 <button disabled={status!=='ready'} onClick={() => startCamera('Intervalo-Fim')} className="bg-gray-50 text-gray-700 p-4 rounded-xl font-bold border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-100 active:scale-95 disabled:opacity-50">Fim Interv.</button>
@@ -428,7 +433,7 @@
                  <div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div>
                  <span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span>
                </div>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.0 (Service Worker Mode)</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.1 (PWA Fixed)</div>
             </div>
 
             {/* MODAL CONFIGURAÇÕES */}
