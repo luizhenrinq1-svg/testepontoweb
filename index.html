@@ -30,7 +30,7 @@
       // ======================================================================
       // CONFIGURAÇÃO DE HOSPEDAGEM EXTERNA (GitHub / Vercel / Netlify)
       // Cole a URL do seu Web App do Google Apps Script (terminada em /exec) aqui:
-      const API_URL = "https://script.google.com/macros/s/AKfycbz7poveyTAAUUdqi1fWEgGTE3eRXWqizE3n5Dx0fMkkMdAsWp-Q_PYrSh7EzO07dXydVA/exec"; 
+      const API_URL = "https://script.google.com/macros/s/AKfycbz7poveyTAAUUdqi1fWEgGTE3eRXWqizE3n5Dx0fMkkMdAsWp-Q_PYrSh7EzO07dXydVA/exec""; 
       // ======================================================================
 
       // Conector para substituir o google.script.run quando hospedado fora
@@ -100,19 +100,38 @@
         const videoRef = useRef(null);
         const lastNotifRef = useRef(null); 
         const titleIntervalRef = useRef(null); // Para piscar o título
+        const wakeLockRef = useRef(null); // Para manter a tela ativa se possível
 
         // Carregar configurações locais
         useEffect(() => {
           const saved = localStorage.getItem('pontoWebConfig');
           if (saved) setNotifConfig(prev => ({...prev, ...JSON.parse(saved)}));
+          
+          // Tenta ativar Wake Lock se notificações estiverem ativas
+          if (saved && JSON.parse(saved).enabled) requestWakeLock();
         }, []);
 
         // Relógio e Verificador de Notificações
         useEffect(() => {
           const timer = setInterval(() => setCurrentTime(new Date()), 1000);
           const notifTimer = setInterval(checkNotifications, 15000); // Verifica a cada 15s
-          return () => { clearInterval(timer); clearInterval(notifTimer); };
+          return () => { clearInterval(timer); clearInterval(notifTimer); releaseWakeLock(); };
         }, [notifConfig, entryTime, lastAction, targetHours]);
+
+        const requestWakeLock = async () => {
+          if ('wakeLock' in navigator) {
+            try {
+              wakeLockRef.current = await navigator.wakeLock.request('screen');
+            } catch (err) { console.log('Wake Lock error:', err); }
+          }
+        };
+
+        const releaseWakeLock = () => {
+          if (wakeLockRef.current) {
+            wakeLockRef.current.release();
+            wakeLockRef.current = null;
+          }
+        };
 
         useEffect(() => {
           try {
@@ -156,7 +175,7 @@
           );
         };
 
-        // --- LÓGICA DE NOTIFICAÇÃO (Versão GitHub - Nativa) ---
+        // --- LÓGICA DE NOTIFICAÇÃO (Versão GitHub - Nativa Melhorada) ---
         const startTitleBlink = (msg) => {
           if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
           let isOriginal = false;
@@ -179,7 +198,7 @@
         };
 
         const playAlert = () => {
-          if (navigator.vibrate) navigator.vibrate([800, 300, 800, 300, 1000]);
+          if (navigator.vibrate) navigator.vibrate([1000, 500, 1000, 500, 1000]);
           try {
             const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
             audio.volume = 1.0;
@@ -189,7 +208,8 @@
 
         const triggerAppAlert = (title, body) => {
            const now = Date.now();
-           if (lastNotifRef.current && lastNotifRef.current.body === body && (now - lastNotifRef.current.time < 300000)) return;
+           // No modo teste (body = 'Teste'), ignora o debounce de tempo
+           if (body !== 'Teste de Notificação' && lastNotifRef.current && lastNotifRef.current.body === body && (now - lastNotifRef.current.time < 300000)) return;
 
            playAlert();
            startTitleBlink(`⚠️ ${title}`); // Pisca a aba
@@ -202,6 +222,8 @@
                     body, 
                     icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png',
                     tag: 'pontoweb-alert',
+                    renotify: true, // Força vibrar de novo se já existir
+                    requireInteraction: true, // Tenta manter na tela
                     vibrate: [300, 100, 400] 
                 });
                 notif.onclick = () => window.focus();
@@ -254,6 +276,7 @@
           Notification.requestPermission().then((permission) => {
             if (permission === "granted") {
               setNotifConfig(prev => ({...prev, enabled: true}));
+              requestWakeLock(); // Pede para manter tela ativa
               playAlert();
               new Notification("PontoWeb Ativado", { body: "Notificações ativas! Você receberá avisos na barra do celular.", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png' });
             } else if (permission === "denied") {
@@ -263,6 +286,10 @@
                setNotifConfig(prev => ({...prev, enabled: true}));
             }
           });
+        };
+
+        const testNotification = () => {
+           triggerAppAlert("Teste PontoWeb", "Teste de Notificação");
         };
 
         const saveSettings = (e) => {
@@ -276,6 +303,7 @@
            setNotifConfig(config);
            localStorage.setItem('pontoWebConfig', JSON.stringify(config));
            setSettingsOpen(false);
+           if(config.enabled) requestWakeLock();
            playAlert();
         };
 
@@ -386,7 +414,7 @@
                  <div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div>
                  <span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span>
                </div>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 3.9 (Polyfill Fix)</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 3.9.5 (WakeLock + Teste)</div>
             </div>
 
             {/* MODAL CONFIGURAÇÕES */}
@@ -414,12 +442,12 @@
                         <input type="number" name="reminderMins" defaultValue={notifConfig.reminderMins} min="1" max="60" className="w-full p-3 bg-gray-50 border rounded-xl font-bold text-center text-lg outline-none focus:border-green-500"/>
                       </div>
                       
-                      <div className="bg-green-50 p-3 rounded-lg text-xs text-green-800 border border-green-200">
-                        ✅ Alertas Ativados (Som + Visual)
-                      </div>
+                      <button type="button" onClick={testNotification} className="w-full py-2 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300 flex items-center justify-center gap-2 text-sm">
+                        🔔 Testar Notificação Agora
+                      </button>
 
                       <div className="bg-yellow-50 p-3 rounded-lg text-xs text-yellow-800 border border-yellow-200">
-                        💡 O sistema usará SOM alto e VIBRAÇÃO para te avisar. Mantenha o celular com volume ligado.
+                        💡 Dica: Se o celular bloquear, as notificações podem atrasar. O sistema tentará manter a tela ativa se possível.
                       </div>
                       <button type="submit" className="w-full bg-green-600 text-white py-3 rounded-xl font-bold shadow hover:bg-green-700">Salvar Preferências</button>
                     </form>
