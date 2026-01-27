@@ -39,6 +39,9 @@
       const API_URL = "https://script.google.com/macros/s/AKfycbz7poveyTAAUUdqi1fWEgGTE3eRXWqizE3n5Dx0fMkkMdAsWp-Q_PYrSh7EzO07dXydVA/exec"; 
       // ======================================================================
 
+      // Arquivo de áudio silencioso para manter o app acordado (Keep Alive)
+      const SILENT_AUDIO = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVMAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAVrGhAAAAAAAAAAAAAAAAAAAAAP/7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABYaW5nAAAADwAAAAQAAAEgOTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5//uQZAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAABDQEAAAMAAABPAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB";
+
       const ExternalBridge = {
         request: async (action, payload = {}) => {
           if (!API_URL.startsWith('http')) {
@@ -73,7 +76,8 @@
         Check: () => <svg className="w-16 h-16 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
         Lock: () => <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>,
         Bell: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>,
-        Alert: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        Alert: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>,
+        Zap: () => <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
       };
 
       function TimeClock() {
@@ -103,15 +107,24 @@
         const lastNotifRef = useRef(null); 
         const titleIntervalRef = useRef(null);
         const wakeLockRef = useRef(null);
+        const silentAudioRef = useRef(null); // Ref para o áudio "Keep Alive"
 
         // --- INICIALIZAÇÃO E SERVICE WORKER ---
         useEffect(() => {
+          // Inicializa o elemento de áudio silencioso
+          const audio = new Audio(SILENT_AUDIO);
+          audio.loop = true;
+          silentAudioRef.current = audio;
+
           // 1. Tenta recuperar Configurações
           const saved = localStorage.getItem('pontoWebConfig');
           if (saved) {
             const config = JSON.parse(saved);
             setNotifConfig(prev => ({...prev, ...config}));
-            if(config.enabled) requestWakeLock();
+            if(config.enabled) {
+               requestWakeLock();
+               // Nota: Audio só toca após interação do usuário, tratamos no botão
+            }
           }
 
           // 2. Registrar Service Worker (Real do GitHub)
@@ -145,6 +158,14 @@
 
         const releaseWakeLock = () => {
           if (wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; }
+        };
+
+        const startKeepAlive = () => {
+           // Toca áudio silencioso para enganar o gerenciador de bateria do Android
+           if(silentAudioRef.current) {
+              silentAudioRef.current.play().catch(e => console.log("Audio play prevented:", e));
+           }
+           requestWakeLock();
         };
 
         // --- DATA LOADING & PERSISTÊNCIA (Login Automático) ---
@@ -277,11 +298,11 @@
           Notification.requestPermission().then((permission) => {
             if (permission === "granted") {
               setNotifConfig(prev => ({...prev, enabled: true}));
-              requestWakeLock();
+              startKeepAlive(); // ATIVA O MODO SENTINELA
               playAlert();
               // Teste Imediato com SW se disponível
               if(swRegistration) {
-                 swRegistration.showNotification("PontoWeb", { body: "Notificações de Barra Ativadas!", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', vibrate: [200,100,200] });
+                 swRegistration.showNotification("PontoWeb", { body: "Notificações e Modo Sentinela Ativados!", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', vibrate: [200,100,200] });
               } else {
                  new Notification("PontoWeb", { body: "Notificações Ativadas!" });
               }
@@ -316,8 +337,10 @@
            setNotifConfig(config);
            localStorage.setItem('pontoWebConfig', JSON.stringify(config));
            setSettingsOpen(false);
-           if(config.enabled) requestWakeLock();
-           playAlert();
+           if(config.enabled) {
+             startKeepAlive();
+             playAlert();
+           }
         };
 
         // --- AÇÕES DO SISTEMA ---
@@ -404,7 +427,11 @@
                 </span>
               </div>
               <div className="flex justify-center items-center gap-2 text-sm opacity-90 mt-2 bg-green-700/30 py-1 px-3 rounded-full inline-flex">
-                <Icon.Map /> {status === 'loading' || status === 'locating' ? 'A procurar GPS...' : status === 'error' ? 'GPS Indisponível' : 'Localização Ativa'}
+                <div className="flex items-center gap-1">
+                   {notifConfig.enabled && <Icon.Zap />}
+                   <Icon.Map /> 
+                </div>
+                {status === 'loading' || status === 'locating' ? 'A procurar GPS...' : status === 'error' ? 'GPS Indisponível' : 'Localização Ativa'}
               </div>
             </div>
 
@@ -434,7 +461,7 @@
                  <div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div>
                  <span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span>
                </div>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.1 (PWA Fixed)</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.2 (Keep Alive)</div>
             </div>
 
             {/* MODAL CONFIGURAÇÕES */}
@@ -466,8 +493,8 @@
                         🔔 Testar Notificação Agora
                       </button>
 
-                      <div className="bg-yellow-50 p-3 rounded-lg text-xs text-yellow-800 border border-yellow-200">
-                        💡 Dica: Se o celular bloquear, as notificações podem atrasar. O sistema tentará manter a tela ativa se possível.
+                      <div className="bg-green-50 p-3 rounded-lg text-xs text-green-800 border border-green-200 flex items-center gap-2">
+                        <Icon.Zap /> <strong>Modo Sentinela Ativo:</strong> O app rodará em segundo plano (pode consumir mais bateria).
                       </div>
                       <button type="submit" className="w-full bg-green-600 text-white py-3 rounded-xl font-bold shadow hover:bg-green-700">Salvar Preferências</button>
                     </form>
