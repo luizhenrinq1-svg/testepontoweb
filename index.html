@@ -89,6 +89,7 @@
         const [result, setResult] = useState(null);
         const [currentTime, setCurrentTime] = useState(new Date()); 
         
+        // Estado das Notificações & PWA
         const [settingsOpen, setSettingsOpen] = useState(false);
         const [notifConfig, setNotifConfig] = useState({
           enabled: false,
@@ -108,6 +109,7 @@
 
         // --- SETUP ---
         useEffect(() => {
+          // Áudio Silencioso
           const audio = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVMAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAVrGhAAAAAAAAAAAAAAAAAAAAAP/7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABYaW5nAAAADwAAAAQAAAEgOTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5//uQZAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAABDQEAAAMAAABPAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB");
           audio.loop = true;
           silentAudioRef.current = audio;
@@ -143,8 +145,26 @@
         };
         const releaseWakeLock = () => { if(wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; } };
         
+        // --- FUNÇÃO CORRIGIDA PARA IPHONE (MEDIA SESSION) ---
         const startKeepAlive = () => {
-           if(silentAudioRef.current) silentAudioRef.current.play().catch(e => {});
+           if(silentAudioRef.current) {
+              silentAudioRef.current.play()
+                .then(() => {
+                    // Truque para o iPhone (iOS) entender que é um "Player de Música"
+                    if ('mediaSession' in navigator) {
+                        navigator.mediaSession.metadata = new MediaMetadata({
+                            title: 'Monitoramento PontoWeb',
+                            artist: 'Sistema Ativo',
+                            album: 'Não feche o app',
+                            artwork: [{ src: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', sizes: '512x512', type: 'image/png' }]
+                        });
+                        // Define ações dummy para ativar o controle de mídia na tela de bloqueio
+                        navigator.mediaSession.setActionHandler('play', function() {});
+                        navigator.mediaSession.setActionHandler('pause', function() {});
+                    }
+                })
+                .catch(e => console.log("Erro ao iniciar áudio:", e));
+           }
            requestWakeLock();
         };
 
@@ -154,7 +174,6 @@
           let id = u.get('id');
           let token = u.get('token');
 
-          // iPhone Fix: Salva sempre que houver ID, tenta recuperar se não houver
           if (id && token) {
              localStorage.setItem('ponto_auth_data', JSON.stringify({ id, token }));
           } else {
@@ -241,7 +260,9 @@
           if (!("Notification" in window)) { alert("Sem suporte."); return; }
           Notification.requestPermission().then((permission) => {
             if (permission === "granted") {
-              setNotifConfig(prev => ({...prev, enabled: true})); startKeepAlive(); playAlert();
+              setNotifConfig(prev => ({...prev, enabled: true})); 
+              startKeepAlive(); // ATIVA TRUQUE IOS
+              playAlert();
               if(swRegistration) swRegistration.showNotification("PontoWeb", { body: "Notificações Ativas!", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png' });
             } else {
               alert("Bloqueado."); setNotifConfig(prev => ({...prev, enabled: true})); 
@@ -348,7 +369,7 @@
             
             <div className="p-6 text-center border-t border-gray-100 mt-2">
                <div className="text-[10px] text-gray-500 mb-1 flex flex-col items-center justify-center gap-1 opacity-80"><div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div><span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span></div>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.5 (iPhone Fix)</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.6 (iOS Media Fix)</div>
             </div>
 
             {settingsOpen && (
