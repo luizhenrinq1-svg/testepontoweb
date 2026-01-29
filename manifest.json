@@ -1,7 +1,6 @@
 {
   "name": "PontoWeb Unespar",
   "short_name": "PontoWeb",
-  "start_url": "./",
   "display": "standalone",
   "background_color": "#f0fdf4",
   "theme_color": "#166534",
