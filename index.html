@@ -74,7 +74,8 @@
         Bell: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>,
         Alert: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>,
         Zap: () => <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>,
-        Download: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        Download: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>,
+        Apple: () => <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.21-1.98 1.07-3.12-1.08.05-2.37.72-3.15 1.6-.69.78-1.29 2.02-1.13 3.24 1.19.09 2.42-.71 3.21-1.72z"/></svg>
       };
 
       function TimeClock() {
@@ -100,6 +101,7 @@
         const [swRegistration, setSwRegistration] = useState(null);
         const [installPrompt, setInstallPrompt] = useState(null);
         const [isStandalone, setIsStandalone] = useState(false); 
+        const [isIOS, setIsIOS] = useState(false); // Detecção de iOS
 
         const videoRef = useRef(null);
         const lastNotifRef = useRef(null); 
@@ -109,7 +111,11 @@
 
         // --- SETUP ---
         useEffect(() => {
-          // Áudio Silencioso
+          // Detectar iOS
+          const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+          setIsIOS(iOS);
+
+          // Áudio Silencioso para Keep Alive
           const audio = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVMAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAVrGhAAAAAAAAAAAAAAAAAAAAAP/7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABYaW5nAAAADwAAAAQAAAEgOTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5//uQZAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAABDQEAAAMAAABPAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB");
           audio.loop = true;
           silentAudioRef.current = audio;
@@ -212,8 +218,16 @@
         };
 
         const playAlert = () => {
+          // No iPhone (iOS), navigator.vibrate não funciona.
+          // Usamos apenas o som. Se for Android, vibra.
           if (navigator.vibrate) navigator.vibrate([1000, 500, 1000, 500, 1000]);
-          try { new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg").play().catch(()=>{}); } catch (e) {}
+          
+          try { 
+            const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+            // No iPhone, volume é controlado pelos botões físicos, mas tentamos definir 100%
+            audio.volume = 1.0; 
+            audio.play().catch(()=>{}); 
+          } catch (e) {}
         };
 
         const triggerAppAlert = (title, body) => {
@@ -224,9 +238,17 @@
            startTitleBlink(`⚠️ ${title}`);
            lastNotifRef.current = { body, time: now };
 
-           if (Notification.permission === 'granted' && swRegistration) {
+           // TENTA USAR O SERVICE WORKER (Android & iOS 16.4+)
+           if (Notification.permission === 'granted' && swRegistration && swRegistration.active) {
               try {
-                swRegistration.showNotification(title, { body, icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', vibrate: [300, 100, 400], tag: 'pontoweb-alert', renotify: true, requireInteraction: true });
+                swRegistration.showNotification(title, { 
+                  body, 
+                  icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', 
+                  vibrate: [300, 100, 400], 
+                  tag: 'pontoweb-alert', 
+                  renotify: true, 
+                  requireInteraction: true 
+                });
               } catch(e) { fallbackNotification(title, body); }
            } else {
              fallbackNotification(title, body);
@@ -261,9 +283,13 @@
           Notification.requestPermission().then((permission) => {
             if (permission === "granted") {
               setNotifConfig(prev => ({...prev, enabled: true})); 
-              startKeepAlive(); // ATIVA TRUQUE IOS
+              startKeepAlive(); // ATIVA TRUQUE IOS E ANDROID
               playAlert();
-              if(swRegistration) swRegistration.showNotification("PontoWeb", { body: "Notificações Ativas!", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png' });
+              if(swRegistration && swRegistration.active) {
+                 swRegistration.showNotification("PontoWeb", { body: "Notificações Ativas!", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png' });
+              } else {
+                 new Notification("PontoWeb", { body: "Notificações Ativadas!" });
+              }
             } else {
               alert("Bloqueado."); setNotifConfig(prev => ({...prev, enabled: true})); 
             }
@@ -369,7 +395,7 @@
             
             <div className="p-6 text-center border-t border-gray-100 mt-2">
                <div className="text-[10px] text-gray-500 mb-1 flex flex-col items-center justify-center gap-1 opacity-80"><div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div><span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span></div>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.6 (iOS Media Fix)</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.7 (iOS Optimized)</div>
             </div>
 
             {settingsOpen && (
@@ -377,13 +403,25 @@
                 <div className="bg-white w-full max-w-sm rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl">
                   <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg text-gray-800 flex items-center gap-2"><Icon.Bell /> Lembretes</h3><button onClick={() => setSettingsOpen(false)} className="text-gray-400 text-2xl">&times;</button></div>
                   {!notifConfig.enabled ? (
-                    <div className="text-center py-6"><p className="text-sm text-gray-600 mb-4 px-4">Ative os alertas para não perder o horário.</p><button onClick={enableAlerts} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow hover:bg-blue-700">Ativar Alertas</button></div>
+                    <div className="text-center py-6">
+                      <p className="text-sm text-gray-600 mb-4 px-4">Ative os alertas para não perder o horário.</p>
+                      {isIOS && <p className="text-xs text-orange-600 mb-3 bg-orange-50 p-2 rounded border border-orange-100">🍎 No iPhone, os alertas requerem iOS 16.4+ e o app instalado na tela de início.</p>}
+                      <button onClick={enableAlerts} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow hover:bg-blue-700">Ativar Alertas</button>
+                    </div>
                   ) : (
                     <form onSubmit={saveSettings} className="space-y-4">
                       <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Seu Horário de Entrada</label><input type="time" name="entryTime" defaultValue={notifConfig.entryTimeStr} className="w-full p-3 bg-gray-50 border rounded-xl font-bold text-center text-lg outline-none focus:border-green-500"/></div>
                       <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Avisar antecedência (minutos)</label><input type="number" name="reminderMins" defaultValue={notifConfig.reminderMins} min="1" max="60" className="w-full p-3 bg-gray-50 border rounded-xl font-bold text-center text-lg outline-none focus:border-green-500"/></div>
                       <button type="button" onClick={testNotification} className="w-full py-2 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300 flex items-center justify-center gap-2 text-sm">🔔 Testar Notificação Agora</button>
-                      <div className="bg-green-50 p-3 rounded-lg text-xs text-green-800 border border-green-200 flex items-center gap-2"><Icon.Zap /> <strong>Modo Sentinela Ativo:</strong> O app rodará em segundo plano.</div>
+                      <div className="bg-green-50 p-3 rounded-lg text-xs text-green-800 border border-green-200 flex items-center gap-2">
+                        <Icon.Zap /> 
+                        <div>
+                          <strong>Modo Sentinela Ativo:</strong>
+                          <span className="block mt-1 font-normal opacity-80">
+                            {isIOS ? 'O app usará som para manter o relógio ativo (Sem vibração no iPhone).' : 'O app rodará em segundo plano.'}
+                          </span>
+                        </div>
+                      </div>
                       <button type="submit" className="w-full bg-green-600 text-white py-3 rounded-xl font-bold shadow hover:bg-green-700">Salvar Preferências</button>
                     </form>
                   )}
