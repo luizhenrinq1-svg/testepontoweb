@@ -2,10 +2,10 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PontoWeb</title>
     
-    <!-- Configurações PWA (Necessário para Instalar) -->
+    <!-- Configurações PWA -->
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#166534">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,7 +17,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      body { background-color: #f0fdf4; color: #166534; font-family: sans-serif; user-select: none; }
+      body { background-color: #f0fdf4; color: #166534; font-family: sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
       .spinner { border: 4px solid #dcfce7; width: 40px; height: 40px; border-radius: 50%; border-left-color: #16a34a; animation: spin 1s linear infinite; }
       @keyframes spin { 100% { transform: rotate(360deg); } }
       .fade-in { animation: fadeIn 0.3s ease-in; }
@@ -34,9 +34,8 @@
       const { useState, useEffect, useRef } = React;
 
       // ======================================================================
-      // CONFIGURAÇÃO DE HOSPEDAGEM EXTERNA (GitHub / Vercel / Netlify)
-      // Cole a URL do seu Web App do Google Apps Script (terminada em /exec) aqui:
-      const API_URL = "https://script.google.com/macros/s/AKfycbz7poveyTAAUUdqi1fWEgGTE3eRXWqizE3n5Dx0fMkkMdAsWp-Q_PYrSh7EzO07dXydVA/exec?id=e7c1cf18&token=ff54ee04-c43f-4239-89d3-9d6d474fa2e7"; 
+      // CONFIGURAÇÃO
+      const API_URL = "https://script.google.com/macros/s/AKfycbz7poveyTAAUUdqi1fWEgGTE3eRXWqizE3n5Dx0fMkkMdAsWp-Q_PYrSh7EzO07dXydVA/exec"; 
       // ======================================================================
 
       const ExternalBridge = {
@@ -90,7 +89,6 @@
         const [result, setResult] = useState(null);
         const [currentTime, setCurrentTime] = useState(new Date()); 
         
-        // Estado das Notificações & PWA
         const [settingsOpen, setSettingsOpen] = useState(false);
         const [notifConfig, setNotifConfig] = useState({
           enabled: false,
@@ -100,7 +98,7 @@
         const [activeAlert, setActiveAlert] = useState(null);
         const [swRegistration, setSwRegistration] = useState(null);
         const [installPrompt, setInstallPrompt] = useState(null);
-        const [isStandalone, setIsStandalone] = useState(false); // NOVO: Estado para verificar se é PWA
+        const [isStandalone, setIsStandalone] = useState(false); 
 
         const videoRef = useRef(null);
         const lastNotifRef = useRef(null); 
@@ -108,9 +106,8 @@
         const wakeLockRef = useRef(null);
         const silentAudioRef = useRef(null);
 
-        // --- INICIALIZAÇÃO E SERVICE WORKER ---
+        // --- SETUP ---
         useEffect(() => {
-          // Inicializa o elemento de áudio silencioso
           const audio = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVMAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAVrGhAAAAAAAAAAAAAAAAAAAAAP/7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABYaW5nAAAADwAAAAQAAAEgOTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5//uQZAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAABDQEAAAMAAABPAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB");
           audio.loop = true;
           silentAudioRef.current = audio;
@@ -119,26 +116,17 @@
           if (saved) {
             const config = JSON.parse(saved);
             setNotifConfig(prev => ({...prev, ...config}));
-            if(config.enabled) {
-               requestWakeLock();
-            }
+            if(config.enabled) requestWakeLock();
           }
 
           if ('serviceWorker' in navigator) {
              navigator.serviceWorker.register('./sw.js')
-               .then(reg => {
-                 console.log('SW Registrado:', reg);
-                 setSwRegistration(reg);
-               })
-               .catch(err => console.log('SW Falha:', err));
+               .then(reg => { setSwRegistration(reg); })
+               .catch(err => console.log('SW Fail:', err));
           }
 
-          window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            setInstallPrompt(e);
-          });
+          window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
 
-          // 4. Verificação Standalone (Esconder botão se já estiver no app)
           if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
             setIsStandalone(true);
           }
@@ -151,27 +139,22 @@
         }, [notifConfig, entryTime, lastAction, targetHours, swRegistration]);
 
         const requestWakeLock = async () => {
-          if ('wakeLock' in navigator) {
-            try { wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch (err) {}
-          }
+          if ('wakeLock' in navigator) { try { wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch (err) {} }
         };
-
-        const releaseWakeLock = () => {
-          if (wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; }
-        };
-
+        const releaseWakeLock = () => { if(wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; } };
+        
         const startKeepAlive = () => {
-           if(silentAudioRef.current) {
-              silentAudioRef.current.play().catch(e => console.log("Audio play prevented:", e));
-           }
+           if(silentAudioRef.current) silentAudioRef.current.play().catch(e => {});
            requestWakeLock();
         };
 
+        // --- DATA LOADING ---
         useEffect(() => {
           const u = new URLSearchParams(window.location.search);
           let id = u.get('id');
           let token = u.get('token');
 
+          // iPhone Fix: Salva sempre que houver ID, tenta recuperar se não houver
           if (id && token) {
              localStorage.setItem('ponto_auth_data', JSON.stringify({ id, token }));
           } else {
@@ -198,32 +181,20 @@
           }
         }, []);
 
+        // --- NOTIFICATIONS ---
         const startTitleBlink = (msg) => {
           if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
           let isOriginal = false;
-          const originalTitle = "Bater Ponto";
+          const originalTitle = "PontoWeb";
           document.title = msg;
-          titleIntervalRef.current = setInterval(() => {
-            document.title = isOriginal ? msg : "🔔 🔔 🔔";
-            isOriginal = !isOriginal;
-          }, 1000);
-          const stopBlink = () => {
-            clearInterval(titleIntervalRef.current);
-            document.title = originalTitle;
-            window.removeEventListener('mousemove', stopBlink);
-            window.removeEventListener('touchstart', stopBlink);
-          };
-          window.addEventListener('mousemove', stopBlink);
-          window.addEventListener('touchstart', stopBlink);
+          titleIntervalRef.current = setInterval(() => { document.title = isOriginal ? msg : "🔔 🔔 🔔"; isOriginal = !isOriginal; }, 1000);
+          const stopBlink = () => { clearInterval(titleIntervalRef.current); document.title = originalTitle; window.removeEventListener('mousemove', stopBlink); window.removeEventListener('touchstart', stopBlink); };
+          window.addEventListener('mousemove', stopBlink); window.addEventListener('touchstart', stopBlink);
         };
 
         const playAlert = () => {
           if (navigator.vibrate) navigator.vibrate([1000, 500, 1000, 500, 1000]);
-          try {
-            const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
-            audio.volume = 1.0;
-            audio.play().catch(() => {});
-          } catch (e) {}
+          try { new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg").play().catch(()=>{}); } catch (e) {}
         };
 
         const triggerAppAlert = (title, body) => {
@@ -236,112 +207,66 @@
 
            if (Notification.permission === 'granted' && swRegistration) {
               try {
-                swRegistration.showNotification(title, {
-                  body: body,
-                  icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png',
-                  vibrate: [300, 100, 400],
-                  tag: 'pontoweb-alert',
-                  renotify: true, 
-                  requireInteraction: true 
-                });
-              } catch(e) { console.log('Erro SW Notif:', e); fallbackNotification(title, body); }
+                swRegistration.showNotification(title, { body, icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', vibrate: [300, 100, 400], tag: 'pontoweb-alert', renotify: true, requireInteraction: true });
+              } catch(e) { fallbackNotification(title, body); }
            } else {
              fallbackNotification(title, body);
            }
-
            setActiveAlert({ title, body });
            setTimeout(() => setActiveAlert(null), 15000); 
         };
 
         const fallbackNotification = (title, body) => {
-           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-             try { new Notification(title, { body, icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png' }); } catch(e){}
-           }
+           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') { try { new Notification(title, { body, icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png' }); } catch(e){} }
         };
 
         const checkNotifications = () => {
           if (!notifConfig.enabled || !targetHours) return;
           const now = new Date();
-          const currentHours = now.getHours();
-          const currentMins = now.getMinutes();
-          const totalCurrentMins = currentHours * 60 + currentMins;
-
+          const totalCurrentMins = now.getHours() * 60 + now.getMinutes();
           if(!notifConfig.entryTimeStr) return;
           const [confH, confM] = notifConfig.entryTimeStr.split(':').map(Number);
           const totalConfigMins = confH * 60 + confM;
           
-          const reminderThreshold = totalConfigMins - notifConfig.reminderMins;
-          if (!lastAction && totalCurrentMins === reminderThreshold) {
-             triggerAppAlert("LEMBRETE PONTO", `Faltam ${notifConfig.reminderMins} minutos.`);
-          }
-          if (!lastAction && totalCurrentMins >= totalConfigMins + 5 && totalCurrentMins < totalConfigMins + 10) {
-             triggerAppAlert("REGISTRO PENDENTE", "Passaram 5 minutos do horário!");
-          }
+          if (!lastAction && totalCurrentMins === (totalConfigMins - notifConfig.reminderMins)) triggerAppAlert("LEMBRETE PONTO", `Faltam ${notifConfig.reminderMins} minutos.`);
+          if (!lastAction && totalCurrentMins === (totalConfigMins + 5)) triggerAppAlert("REGISTRO PENDENTE", "Passaram 5 minutos do horário!");
           if (entryTime && lastAction !== 'Saida') {
-             const [entryH, entryM] = entryTime.split(':').map(Number);
-             const entryTotal = entryH * 60 + entryM;
-             const workedMins = totalCurrentMins - entryTotal; 
-             const targetMins = targetHours * 60;
-             if (workedMins >= targetMins && workedMins < targetMins + 5) { 
-                triggerAppAlert("META ATINGIDA", `Você completou ${targetHours} horas.`);
-             }
+             const [eH, eM] = entryTime.split(':').map(Number);
+             const worked = totalCurrentMins - (eH * 60 + eM);
+             if (worked === (targetHours * 60)) triggerAppAlert("META ATINGIDA", `Você completou ${targetHours} horas.`);
           }
         };
 
         const enableAlerts = () => {
-          if (!("Notification" in window)) { alert("Navegador sem suporte."); return; }
+          if (!("Notification" in window)) { alert("Sem suporte."); return; }
           Notification.requestPermission().then((permission) => {
             if (permission === "granted") {
-              setNotifConfig(prev => ({...prev, enabled: true}));
-              startKeepAlive();
-              playAlert();
-              if(swRegistration) {
-                 swRegistration.showNotification("PontoWeb", { body: "Notificações e Modo Sentinela Ativados!", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', vibrate: [200,100,200] });
-              } else {
-                 new Notification("PontoWeb", { body: "Notificações Ativadas!" });
-              }
+              setNotifConfig(prev => ({...prev, enabled: true})); startKeepAlive(); playAlert();
+              if(swRegistration) swRegistration.showNotification("PontoWeb", { body: "Notificações Ativas!", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png' });
             } else {
-              alert("Notificações bloqueadas. Verifique as configurações do navegador.");
-              setNotifConfig(prev => ({...prev, enabled: true})); 
+              alert("Bloqueado."); setNotifConfig(prev => ({...prev, enabled: true})); 
             }
           });
         };
 
         const installPWA = () => {
-           if(installPrompt) {
-              installPrompt.prompt();
-              installPrompt.userChoice.then(res => setInstallPrompt(null));
-           } else {
-              alert("Para instalar: Abra o menu do navegador e procure por 'Adicionar à Tela Inicial' ou 'Instalar Aplicativo'.");
-           }
+           if(installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(res => setInstallPrompt(null)); } 
+           else { alert("Instale via menu do navegador: 'Adicionar à Tela Inicial'."); }
         };
 
-        const testNotification = () => {
-           triggerAppAlert("Teste PontoWeb", "Teste de Notificação");
-        };
+        const testNotification = () => { triggerAppAlert("Teste PontoWeb", "Teste de Notificação"); };
 
         const saveSettings = (e) => {
            e.preventDefault();
            const formData = new FormData(e.target);
-           const config = {
-             enabled: notifConfig.enabled,
-             entryTimeStr: formData.get('entryTime'),
-             reminderMins: Number(formData.get('reminderMins'))
-           };
+           const config = { enabled: notifConfig.enabled, entryTimeStr: formData.get('entryTime'), reminderMins: Number(formData.get('reminderMins')) };
            setNotifConfig(config);
            localStorage.setItem('pontoWebConfig', JSON.stringify(config));
            setSettingsOpen(false);
-           if(config.enabled) {
-             startKeepAlive();
-             playAlert();
-           }
+           if(config.enabled) { startKeepAlive(); playAlert(); }
         };
 
-        const resetState = () => {
-           setResult(null); setPunchType(null); setStatus('loading');
-           if (params) loadBolsista(params.id, params.token);
-           initGPS();
-        };
+        const resetState = () => { setResult(null); setPunchType(null); setStatus('loading'); if (params) loadBolsista(params.id, params.token); initGPS(); };
 
         const startCamera = async (type) => {
           setPunchType(type); setStatus('punching');
@@ -352,75 +277,59 @@
         };
 
         const confirm = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = 320; canvas.height = 240;
+          const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 240;
           const ctx = canvas.getContext('2d');
-          if (videoRef.current) {
-             ctx.drawImage(videoRef.current, 0, 0, 320, 240);
-             const stream = videoRef.current.srcObject;
-             if (stream) stream.getTracks().forEach(t => t.stop());
-          }
-          const foto = canvas.toDataURL('image/jpeg', 0.7);
+          if (videoRef.current) { ctx.drawImage(videoRef.current, 0, 0, 320, 240); videoRef.current.srcObject.getTracks().forEach(t => t.stop()); }
           setStatus('sending');
-          const payload = {
-            pessoaId: params.id, token: params.token, tipo: punchType,
-            lat: location?.latitude, lng: location?.longitude, prec: location?.accuracy, fotoBase64: foto
-          };
           google.script.run.withSuccessHandler((res) => {
-               if(res.ok) { setResult(res); setStatus('success'); } 
-               else { alert("Erro: " + res.msg); setStatus('ready'); }
-            }).withFailureHandler((err) => { alert("Erro de servidor: " + err.message); setStatus('ready'); })
-            .registrarPonto(payload);
+             if(res.ok) { setResult(res); setStatus('success'); } else { alert("Erro: " + res.msg); setStatus('ready'); }
+          }).registrarPonto({
+             pessoaId: params.id, token: params.token, tipo: punchType,
+             lat: location?.latitude, lng: location?.longitude, prec: location?.accuracy, fotoBase64: canvas.toDataURL('image/jpeg', 0.7)
+          });
         };
 
-        if (status === 'no-link') return <div className="h-screen flex items-center justify-center p-4 text-center"><div><h1 className="text-xl font-bold text-red-600">Link Inválido</h1><p className="text-gray-600 mt-2">Use o link fornecido pelo gestor.</p></div></div>;
+        // --- RENDER ---
+        if (status === 'no-link') return (
+          <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
+            <div className="bg-white p-6 rounded-2xl shadow-lg border border-red-100 max-w-sm">
+              <div className="text-red-500 mb-3"><svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg></div>
+              <h2 className="text-xl font-bold text-gray-800 mb-2">Acesso não identificado</h2>
+              <p className="text-gray-600 text-sm mb-4">Se você está no iPhone/Android e acabou de instalar o app:</p>
+              <ol className="text-left text-sm text-gray-700 list-decimal pl-5 space-y-2 mb-4">
+                <li>Feche este app.</li>
+                <li>Vá no WhatsApp/Email e <strong>clique no link original</strong> do seu ponto novamente.</li>
+                <li>O sistema vai salvar seu login automaticamente.</li>
+                <li>Depois, abra este app de novo.</li>
+              </ol>
+            </div>
+          </div>
+        );
+
         if (status === 'success') return <div className="h-screen flex flex-col items-center justify-center bg-white p-6 text-center fade-in"><Icon.Check /><h2 className="text-2xl font-bold mt-4 text-green-700">Ponto Registrado!</h2><p className="text-4xl font-bold mt-2 text-gray-800">{result.timestamp.split(' ')[1]}</p><p className="text-gray-500 mt-1">{result.status}</p><button onClick={resetState} className="mt-10 px-8 py-3 bg-green-50 text-green-700 font-bold rounded-full hover:bg-green-100 shadow-sm">Voltar</button></div>;
         if (status === 'punching') return <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50 fade-in"><video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover opacity-80"></video><div className="absolute bottom-10 w-full px-6 flex gap-4"><button onClick={() => { if(videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t=>t.stop()); setStatus('ready'); }} className="flex-1 bg-white text-black py-4 rounded-xl font-bold shadow-lg">Cancelar</button><button onClick={confirm} className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 active:scale-95 transition-transform"><Icon.Camera/> Confirmar</button></div><div className="absolute top-10 text-white font-bold text-xl drop-shadow-md bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">A registar {punchType}</div></div>;
 
         return (
           <div className="min-h-screen max-w-md mx-auto bg-white shadow-xl flex flex-col relative">
-            
             {activeAlert && (
               <div className="fixed top-0 left-0 right-0 z-[100] p-4 slide-down">
                 <div className="bg-white border-l-4 border-orange-500 shadow-2xl rounded-lg p-4 flex items-start gap-3">
                   <div className="text-orange-500 animate-bounce"><Icon.Alert /></div>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-gray-800 text-lg">{activeAlert.title}</h4>
-                    <p className="text-gray-600 font-medium">{activeAlert.body}</p>
-                  </div>
+                  <div className="flex-1"><h4 className="font-bold text-gray-800 text-lg">{activeAlert.title}</h4><p className="text-gray-600 font-medium">{activeAlert.body}</p></div>
                   <button onClick={() => setActiveAlert(null)} className="text-gray-400 font-bold p-2">✕</button>
                 </div>
               </div>
             )}
 
             <div className="bg-green-600 p-6 text-white text-center rounded-b-3xl shadow-lg z-10 transition-all relative">
-              
-              {/* BOTÃO INSTALAR PWA (Visível apenas se NÃO estiver instalado) */}
               {!isStandalone && (
-                <button onClick={installPWA} className="absolute top-4 left-4 bg-green-700/50 p-2 rounded-full text-green-100 hover:text-white hover:bg-green-500 transition-all z-20" title={installPrompt ? "Instalar Aplicativo" : "App Instalado"}>
-                   <Icon.Download />
-                </button>
+                <button onClick={installPWA} className="absolute top-4 left-4 bg-green-700/50 p-2 rounded-full text-green-100 hover:text-white hover:bg-green-500 transition-all z-20" title={installPrompt ? "Instalar Aplicativo" : "App Instalado"}><Icon.Download /></button>
               )}
-
-              <button onClick={() => setSettingsOpen(true)} className={`absolute top-4 right-4 text-green-100 hover:text-white bg-green-700/50 p-2 rounded-full ${notifConfig.enabled ? 'bell-shake' : ''}`}>
-                 <Icon.Bell />
-                 {notifConfig.enabled && <span className="absolute top-0 right-0 w-3 h-3 bg-red-400 rounded-full border-2 border-green-600"></span>}
-              </button>
-
+              <button onClick={() => setSettingsOpen(true)} className={`absolute top-4 right-4 text-green-100 hover:text-white bg-green-700/50 p-2 rounded-full ${notifConfig.enabled ? 'bell-shake' : ''}`}><Icon.Bell />{notifConfig.enabled && <span className="absolute top-0 right-0 w-3 h-3 bg-red-400 rounded-full border-2 border-green-600"></span>}</button>
               <h1 className="text-2xl font-bold mt-2">PontoWeb Unespar</h1>
-              <div className="flex flex-col items-center mt-1 mb-1">
-                <span className="text-4xl font-mono font-bold tracking-widest drop-shadow-md">
-                  {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                </span>
-                <span className="text-xs text-green-100 uppercase tracking-wide font-medium mt-1">
-                  {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                </span>
-              </div>
+              <div className="flex flex-col items-center mt-1 mb-1"><span className="text-4xl font-mono font-bold tracking-widest drop-shadow-md">{currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span><span className="text-xs text-green-100 uppercase tracking-wide font-medium mt-1">{currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
               <div className="flex justify-center items-center gap-2 text-sm opacity-90 mt-2 bg-green-700/30 py-1 px-3 rounded-full inline-flex">
-                <div className="flex items-center gap-1">
-                   {notifConfig.enabled && <Icon.Zap />}
-                   <Icon.Map /> 
-                </div>
+                <div className="flex items-center gap-1">{notifConfig.enabled && <Icon.Zap />}<Icon.Map /></div>
                 {status === 'loading' || status === 'locating' ? 'A procurar GPS...' : status === 'error' ? 'GPS Indisponível' : 'Localização Ativa'}
               </div>
             </div>
@@ -428,18 +337,9 @@
             {status === 'sending' && <div className="absolute inset-0 bg-white/90 z-50 flex flex-col items-center justify-center backdrop-blur-sm fade-in"><div className="spinner mb-4"></div><p className="text-green-700 font-bold animate-pulse">A enviar dados...</p></div>}
 
             <div className="flex-1 p-6 flex flex-col justify-center gap-4">
-              <div className="text-center mb-2">
-                <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Bolsista Identificado</p>
-                <h3 className="text-xl font-bold text-gray-800">{bolsistaName || 'A carregar...'}</h3>
-                {entryTime && <div className="mt-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-bold inline-block">Entrada às: {entryTime}</div>}
-              </div>
-              
-              <button disabled={status!=='ready'} onClick={() => startCamera('Entrada')} className="bg-green-50 text-green-700 border-2 border-green-200 p-5 rounded-2xl font-bold text-xl hover:bg-green-100 hover:border-green-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 shadow-sm">
-                ENTRADA
-              </button>
-              <button disabled={status!=='ready'} onClick={() => startCamera('Saida')} className="bg-red-50 text-red-700 border-2 border-red-200 p-5 rounded-2xl font-bold text-xl hover:bg-red-100 hover:border-red-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 shadow-sm">
-                SAÍDA
-              </button>
+              <div className="text-center mb-2"><p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Bolsista Identificado</p><h3 className="text-xl font-bold text-gray-800">{bolsistaName || 'A carregar...'}</h3>{entryTime && <div className="mt-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-bold inline-block">Entrada às: {entryTime}</div>}</div>
+              <button disabled={status!=='ready'} onClick={() => startCamera('Entrada')} className="bg-green-50 text-green-700 border-2 border-green-200 p-5 rounded-2xl font-bold text-xl hover:bg-green-100 hover:border-green-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 shadow-sm">ENTRADA</button>
+              <button disabled={status!=='ready'} onClick={() => startCamera('Saida')} className="bg-red-50 text-red-700 border-2 border-red-200 p-5 rounded-2xl font-bold text-xl hover:bg-red-100 hover:border-red-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 shadow-sm">SAÍDA</button>
               <div className="grid grid-cols-2 gap-4 mt-2">
                 <button disabled={status!=='ready'} onClick={() => startCamera('Intervalo-Inicio')} className="bg-gray-50 text-gray-700 p-4 rounded-xl font-bold border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-100 active:scale-95 disabled:opacity-50">Início Interv.</button>
                 <button disabled={status!=='ready'} onClick={() => startCamera('Intervalo-Fim')} className="bg-gray-50 text-gray-700 p-4 rounded-xl font-bold border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-100 active:scale-95 disabled:opacity-50">Fim Interv.</button>
@@ -447,55 +347,31 @@
             </div>
             
             <div className="p-6 text-center border-t border-gray-100 mt-2">
-               <div className="text-[10px] text-gray-500 mb-1 flex flex-col items-center justify-center gap-1 opacity-80">
-                 <div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div>
-                 <span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span>
-               </div>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.4 (Auto Hide Install)</div>
+               <div className="text-[10px] text-gray-500 mb-1 flex flex-col items-center justify-center gap-1 opacity-80"><div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div><span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span></div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.5 (iPhone Fix)</div>
             </div>
 
             {settingsOpen && (
               <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 fade-in">
                 <div className="bg-white w-full max-w-sm rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2"><Icon.Bell /> Lembretes</h3>
-                    <button onClick={() => setSettingsOpen(false)} className="text-gray-400 text-2xl">&times;</button>
-                  </div>
-                  
+                  <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg text-gray-800 flex items-center gap-2"><Icon.Bell /> Lembretes</h3><button onClick={() => setSettingsOpen(false)} className="text-gray-400 text-2xl">&times;</button></div>
                   {!notifConfig.enabled ? (
-                    <div className="text-center py-6">
-                       <p className="text-sm text-gray-600 mb-4 px-4">Ative os alertas para não perder o horário de entrada e saída.</p>
-                       <button onClick={enableAlerts} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow hover:bg-blue-700">Ativar Alertas</button>
-                    </div>
+                    <div className="text-center py-6"><p className="text-sm text-gray-600 mb-4 px-4">Ative os alertas para não perder o horário.</p><button onClick={enableAlerts} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow hover:bg-blue-700">Ativar Alertas</button></div>
                   ) : (
                     <form onSubmit={saveSettings} className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Seu Horário de Entrada</label>
-                        <input type="time" name="entryTime" defaultValue={notifConfig.entryTimeStr} className="w-full p-3 bg-gray-50 border rounded-xl font-bold text-center text-lg outline-none focus:border-green-500"/>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Avisar antecedência (minutos)</label>
-                        <input type="number" name="reminderMins" defaultValue={notifConfig.reminderMins} min="1" max="60" className="w-full p-3 bg-gray-50 border rounded-xl font-bold text-center text-lg outline-none focus:border-green-500"/>
-                      </div>
-                      
-                      <button type="button" onClick={testNotification} className="w-full py-2 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300 flex items-center justify-center gap-2 text-sm">
-                        🔔 Testar Notificação Agora
-                      </button>
-
-                      <div className="bg-green-50 p-3 rounded-lg text-xs text-green-800 border border-green-200 flex items-center gap-2">
-                        <Icon.Zap /> <strong>Modo Sentinela Ativo:</strong> O app rodará em segundo plano (pode consumir mais bateria).
-                      </div>
+                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Seu Horário de Entrada</label><input type="time" name="entryTime" defaultValue={notifConfig.entryTimeStr} className="w-full p-3 bg-gray-50 border rounded-xl font-bold text-center text-lg outline-none focus:border-green-500"/></div>
+                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Avisar antecedência (minutos)</label><input type="number" name="reminderMins" defaultValue={notifConfig.reminderMins} min="1" max="60" className="w-full p-3 bg-gray-50 border rounded-xl font-bold text-center text-lg outline-none focus:border-green-500"/></div>
+                      <button type="button" onClick={testNotification} className="w-full py-2 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300 flex items-center justify-center gap-2 text-sm">🔔 Testar Notificação Agora</button>
+                      <div className="bg-green-50 p-3 rounded-lg text-xs text-green-800 border border-green-200 flex items-center gap-2"><Icon.Zap /> <strong>Modo Sentinela Ativo:</strong> O app rodará em segundo plano.</div>
                       <button type="submit" className="w-full bg-green-600 text-white py-3 rounded-xl font-bold shadow hover:bg-green-700">Salvar Preferências</button>
                     </form>
                   )}
                 </div>
               </div>
             )}
-
           </div>
         );
       }
-
       const root = ReactDOM.createRoot(document.getElementById('root'));
       root.render(<TimeClock />);
     </script>
