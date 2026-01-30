@@ -20,12 +20,12 @@
       body { background-color: #f0fdf4; color: #166534; font-family: sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
       .spinner { border: 4px solid #dcfce7; width: 40px; height: 40px; border-radius: 50%; border-left-color: #16a34a; animation: spin 1s linear infinite; }
       @keyframes spin { 100% { transform: rotate(360deg); } }
-      .fade-in { animation: fadeIn 0.3s ease-in; }
-      @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
       .slide-down { animation: slideDown 0.5s ease-out forwards; }
       @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       .bell-shake { animation: shake 2s infinite; transform-origin: top center; }
       @keyframes shake { 0% { transform: rotate(0deg); } 10% { transform: rotate(10deg); } 20% { transform: rotate(-10deg); } 30% { transform: rotate(6deg); } 40% { transform: rotate(-6deg); } 50% { transform: rotate(0deg); } 100% { transform: rotate(0deg); } }
+      .pulse-dot { animation: pulse-green 2s infinite; }
+      @keyframes pulse-green { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); } }
     </style>
   </head>
   <body>
@@ -75,7 +75,7 @@
         Alert: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>,
         Zap: () => <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>,
         Download: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>,
-        Apple: () => <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.21-1.98 1.07-3.12-1.08.05-2.37.72-3.15 1.6-.69.78-1.29 2.02-1.13 3.24 1.19.09 2.42-.71 3.21-1.72z"/></svg>
+        Play: () => <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
       };
 
       function TimeClock() {
@@ -90,35 +90,27 @@
         const [result, setResult] = useState(null);
         const [currentTime, setCurrentTime] = useState(new Date()); 
         
-        // Estado das Notificações & PWA
         const [settingsOpen, setSettingsOpen] = useState(false);
-        const [notifConfig, setNotifConfig] = useState({
-          enabled: false,
-          entryTimeStr: '08:00',
-          reminderMins: 10
-        });
+        const [notifConfig, setNotifConfig] = useState({ enabled: false, entryTimeStr: '08:00', reminderMins: 10 });
         const [activeAlert, setActiveAlert] = useState(null);
         const [swRegistration, setSwRegistration] = useState(null);
         const [installPrompt, setInstallPrompt] = useState(null);
         const [isStandalone, setIsStandalone] = useState(false); 
-        const [isIOS, setIsIOS] = useState(false); // Detecção de iOS
+        const [isIOS, setIsIOS] = useState(false);
+        const [monitorActive, setMonitorActive] = useState(false); // Feedback visual do monitor
 
         const videoRef = useRef(null);
         const lastNotifRef = useRef(null); 
         const titleIntervalRef = useRef(null);
         const wakeLockRef = useRef(null);
-        const silentAudioRef = useRef(null);
+        
+        // Elemento de áudio "Fantasma" - Essencial para o iPhone
+        const phantomAudioRef = useRef(null);
 
         // --- SETUP ---
         useEffect(() => {
-          // Detectar iOS
           const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
           setIsIOS(iOS);
-
-          // Áudio Silencioso para Keep Alive
-          const audio = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVMAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAVrGhAAAAAAAAAAAAAAAAAAAAAP/7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABYaW5nAAAADwAAAAQAAAEgOTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5//uQZAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAABDQEAAAMAAABPAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB");
-          audio.loop = true;
-          silentAudioRef.current = audio;
 
           const saved = localStorage.getItem('pontoWebConfig');
           if (saved) {
@@ -128,9 +120,7 @@
           }
 
           if ('serviceWorker' in navigator) {
-             navigator.serviceWorker.register('./sw.js')
-               .then(reg => { setSwRegistration(reg); })
-               .catch(err => console.log('SW Fail:', err));
+             navigator.serviceWorker.register('./sw.js').then(reg => { setSwRegistration(reg); }).catch(e => {});
           }
 
           window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
@@ -141,8 +131,15 @@
         }, []);
 
         useEffect(() => {
-          const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+          // Loop principal do relógio
+          const timer = setInterval(() => {
+             setCurrentTime(new Date());
+             // Feedback visual de que o monitor está rodando
+             setMonitorActive(prev => !prev);
+          }, 1000);
+          
           const notifTimer = setInterval(checkNotifications, 15000); 
+          
           return () => { clearInterval(timer); clearInterval(notifTimer); releaseWakeLock(); };
         }, [notifConfig, entryTime, lastAction, targetHours, swRegistration]);
 
@@ -151,25 +148,24 @@
         };
         const releaseWakeLock = () => { if(wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; } };
         
-        // --- FUNÇÃO CORRIGIDA PARA IPHONE (MEDIA SESSION) ---
+        // --- TÉCNICA "PLAYER FANTASMA" PARA IPHONE ---
         const startKeepAlive = () => {
-           if(silentAudioRef.current) {
-              silentAudioRef.current.play()
+           const audio = phantomAudioRef.current;
+           if(audio) {
+              audio.volume = 0.05; // Baixo, mas não zero (alguns iPhones pausam se for 0)
+              audio.play()
                 .then(() => {
-                    // Truque para o iPhone (iOS) entender que é um "Player de Música"
                     if ('mediaSession' in navigator) {
                         navigator.mediaSession.metadata = new MediaMetadata({
                             title: 'Monitoramento PontoWeb',
-                            artist: 'Sistema Ativo',
-                            album: 'Não feche o app',
+                            artist: 'Não feche o app',
                             artwork: [{ src: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', sizes: '512x512', type: 'image/png' }]
                         });
-                        // Define ações dummy para ativar o controle de mídia na tela de bloqueio
-                        navigator.mediaSession.setActionHandler('play', function() {});
-                        navigator.mediaSession.setActionHandler('pause', function() {});
+                        navigator.mediaSession.setActionHandler('play', () => audio.play());
+                        navigator.mediaSession.setActionHandler('pause', () => audio.play()); // Força play se tentar pausar
                     }
                 })
-                .catch(e => console.log("Erro ao iniciar áudio:", e));
+                .catch(e => console.log("Erro áudio:", e));
            }
            requestWakeLock();
         };
@@ -218,15 +214,11 @@
         };
 
         const playAlert = () => {
-          // No iPhone (iOS), navigator.vibrate não funciona.
-          // Usamos apenas o som. Se for Android, vibra.
           if (navigator.vibrate) navigator.vibrate([1000, 500, 1000, 500, 1000]);
-          
           try { 
-            const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
-            // No iPhone, volume é controlado pelos botões físicos, mas tentamos definir 100%
-            audio.volume = 1.0; 
-            audio.play().catch(()=>{}); 
+            const alertAudio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+            alertAudio.volume = 1.0; 
+            alertAudio.play().catch(()=>{}); 
           } catch (e) {}
         };
 
@@ -238,7 +230,6 @@
            startTitleBlink(`⚠️ ${title}`);
            lastNotifRef.current = { body, time: now };
 
-           // TENTA USAR O SERVICE WORKER (Android & iOS 16.4+)
            if (Notification.permission === 'granted' && swRegistration && swRegistration.active) {
               try {
                 swRegistration.showNotification(title, { 
@@ -264,7 +255,9 @@
         const checkNotifications = () => {
           if (!notifConfig.enabled || !targetHours) return;
           const now = new Date();
-          const totalCurrentMins = now.getHours() * 60 + now.getMinutes();
+          const currentHours = now.getHours();
+          const currentMins = now.getMinutes();
+          const totalCurrentMins = currentHours * 60 + currentMins;
           if(!notifConfig.entryTimeStr) return;
           const [confH, confM] = notifConfig.entryTimeStr.split(':').map(Number);
           const totalConfigMins = confH * 60 + confM;
@@ -283,12 +276,12 @@
           Notification.requestPermission().then((permission) => {
             if (permission === "granted") {
               setNotifConfig(prev => ({...prev, enabled: true})); 
-              startKeepAlive(); // ATIVA TRUQUE IOS E ANDROID
+              startKeepAlive();
               playAlert();
               if(swRegistration && swRegistration.active) {
-                 swRegistration.showNotification("PontoWeb", { body: "Notificações Ativas!", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png' });
+                 swRegistration.showNotification("PontoWeb", { body: "Monitoramento Ativo!", icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png' });
               } else {
-                 new Notification("PontoWeb", { body: "Notificações Ativadas!" });
+                 new Notification("PontoWeb", { body: "Monitoramento Ativo!" });
               }
             } else {
               alert("Bloqueado."); setNotifConfig(prev => ({...prev, enabled: true})); 
@@ -340,15 +333,8 @@
         if (status === 'no-link') return (
           <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-red-100 max-w-sm">
-              <div className="text-red-500 mb-3"><svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg></div>
               <h2 className="text-xl font-bold text-gray-800 mb-2">Acesso não identificado</h2>
-              <p className="text-gray-600 text-sm mb-4">Se você está no iPhone/Android e acabou de instalar o app:</p>
-              <ol className="text-left text-sm text-gray-700 list-decimal pl-5 space-y-2 mb-4">
-                <li>Feche este app.</li>
-                <li>Vá no WhatsApp/Email e <strong>clique no link original</strong> do seu ponto novamente.</li>
-                <li>O sistema vai salvar seu login automaticamente.</li>
-                <li>Depois, abra este app de novo.</li>
-              </ol>
+              <p className="text-gray-600 text-sm mb-4">Vá no WhatsApp/Email e clique no link original do seu ponto.</p>
             </div>
           </div>
         );
@@ -358,6 +344,10 @@
 
         return (
           <div className="min-h-screen max-w-md mx-auto bg-white shadow-xl flex flex-col relative">
+            
+            {/* ELEMENTO DE AUDIO "FANTASMA" (White Noise) */}
+            <audio ref={phantomAudioRef} loop preload="auto" src="https://github.com/anars/blank-audio/raw/master/10-minutes-of-silence.mp3"></audio>
+
             {activeAlert && (
               <div className="fixed top-0 left-0 right-0 z-[100] p-4 slide-down">
                 <div className="bg-white border-l-4 border-orange-500 shadow-2xl rounded-lg p-4 flex items-start gap-3">
@@ -376,7 +366,12 @@
               <h1 className="text-2xl font-bold mt-2">PontoWeb Unespar</h1>
               <div className="flex flex-col items-center mt-1 mb-1"><span className="text-4xl font-mono font-bold tracking-widest drop-shadow-md">{currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span><span className="text-xs text-green-100 uppercase tracking-wide font-medium mt-1">{currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
               <div className="flex justify-center items-center gap-2 text-sm opacity-90 mt-2 bg-green-700/30 py-1 px-3 rounded-full inline-flex">
-                <div className="flex items-center gap-1">{notifConfig.enabled && <Icon.Zap />}<Icon.Map /></div>
+                <div className="flex items-center gap-2">
+                   {/* Ponto Pulsante: Indica que o monitor está vivo */}
+                   {notifConfig.enabled && <div className={`w-3 h-3 rounded-full bg-green-300 ${monitorActive ? 'pulse-dot' : ''}`}></div>}
+                   {notifConfig.enabled && <Icon.Zap />}
+                   <Icon.Map /> 
+                </div>
                 {status === 'loading' || status === 'locating' ? 'A procurar GPS...' : status === 'error' ? 'GPS Indisponível' : 'Localização Ativa'}
               </div>
             </div>
@@ -395,7 +390,7 @@
             
             <div className="p-6 text-center border-t border-gray-100 mt-2">
                <div className="text-[10px] text-gray-500 mb-1 flex flex-col items-center justify-center gap-1 opacity-80"><div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div><span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span></div>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.7 (iOS Optimized)</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.8 (Phantom Player)</div>
             </div>
 
             {settingsOpen && (
@@ -405,7 +400,7 @@
                   {!notifConfig.enabled ? (
                     <div className="text-center py-6">
                       <p className="text-sm text-gray-600 mb-4 px-4">Ative os alertas para não perder o horário.</p>
-                      {isIOS && <p className="text-xs text-orange-600 mb-3 bg-orange-50 p-2 rounded border border-orange-100">🍎 No iPhone, os alertas requerem iOS 16.4+ e o app instalado na tela de início.</p>}
+                      {isIOS && <p className="text-xs text-orange-600 mb-3 bg-orange-50 p-2 rounded border border-orange-100">🍎 No iPhone, o áudio de monitoramento aparecerá na tela de bloqueio. Não pause.</p>}
                       <button onClick={enableAlerts} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow hover:bg-blue-700">Ativar Alertas</button>
                     </div>
                   ) : (
@@ -416,9 +411,9 @@
                       <div className="bg-green-50 p-3 rounded-lg text-xs text-green-800 border border-green-200 flex items-center gap-2">
                         <Icon.Zap /> 
                         <div>
-                          <strong>Modo Sentinela Ativo:</strong>
+                          <strong>Monitoramento Ativo:</strong>
                           <span className="block mt-1 font-normal opacity-80">
-                            {isIOS ? 'O app usará som para manter o relógio ativo (Sem vibração no iPhone).' : 'O app rodará em segundo plano.'}
+                            {isIOS ? 'Se um player aparecer na tela de bloqueio, mantenha-o rodando.' : 'O app rodará em segundo plano.'}
                           </span>
                         </div>
                       </div>
