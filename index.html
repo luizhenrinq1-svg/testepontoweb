@@ -96,8 +96,13 @@
         const [result, setResult] = useState(null);
         const [currentTime, setCurrentTime] = useState(new Date()); 
         
+        // Estado das Notificações & PWA
         const [settingsOpen, setSettingsOpen] = useState(false);
-        const [notifConfig, setNotifConfig] = useState({ enabled: false, entryTimeStr: '08:00', reminderMins: 10 });
+        const [notifConfig, setNotifConfig] = useState({
+          enabled: false,
+          entryTimeStr: '08:00',
+          reminderMins: 10
+        });
         const [activeAlert, setActiveAlert] = useState(null);
         const [swRegistration, setSwRegistration] = useState(null);
         const [installPrompt, setInstallPrompt] = useState(null);
@@ -109,36 +114,11 @@
         const lastNotifRef = useRef(null); 
         const titleIntervalRef = useRef(null);
         const wakeLockRef = useRef(null);
-        const phantomAudioRef = useRef(null); // Corrigido: Definido para uso no DOM
+        
+        // CORREÇÃO: Declarando a referência que estava faltando
+        const phantomAudioRef = useRef(null);
 
-        const requestWakeLock = async () => {
-          if ('wakeLock' in navigator) { try { wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch (err) {} }
-        };
-        const releaseWakeLock = () => { if(wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; } };
-
-        const startKeepAlive = useCallback(() => {
-           if(phantomAudioRef.current) {
-              const audio = phantomAudioRef.current;
-              audio.loop = true;
-              audio.volume = 0.05;
-              audio.play()
-                .then(() => {
-                    if ('mediaSession' in navigator) {
-                        navigator.mediaSession.metadata = new MediaMetadata({
-                            title: 'Monitoramento PontoWeb',
-                            artist: 'Sistema Ativo (36h)',
-                            album: 'Não feche o app',
-                            artwork: [{ src: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', sizes: '512x512', type: 'image/png' }]
-                        });
-                        navigator.mediaSession.setActionHandler('play', () => audio.play());
-                        navigator.mediaSession.setActionHandler('pause', () => audio.play());
-                    }
-                })
-                .catch(e => console.log("Erro ao iniciar áudio:", e));
-           }
-           requestWakeLock();
-        }, []);
-
+        // --- SETUP ---
         useEffect(() => {
           const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
           setIsIOS(iOS);
@@ -162,31 +142,48 @@
         }, []);
 
         useEffect(() => {
-           const handleVisibilityChange = () => {
-              if (document.visibilityState === 'visible') {
-                 if (notifConfig.enabled) {
-                    startKeepAlive();
-                 }
-                 setCurrentTime(new Date());
-                 setMonitorActive(true);
-              }
-           };
-           document.addEventListener("visibilitychange", handleVisibilityChange);
-           return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-        }, [notifConfig.enabled, startKeepAlive]);
-
-        useEffect(() => {
+          // Loop principal do relógio
           const timer = setInterval(() => {
              setCurrentTime(new Date());
+             // Feedback visual de que o monitor está rodando
              setMonitorActive(prev => !prev);
           }, 1000);
           
           const notifTimer = setInterval(checkNotifications, 15000); 
+          
           return () => { clearInterval(timer); clearInterval(notifTimer); releaseWakeLock(); };
         }, [notifConfig, entryTime, lastAction, targetHours, swRegistration]);
 
-        // --- DATA LOADING (MODIFICADO PARA USUÁRIO ESPECÍFICO) ---
+        const requestWakeLock = async () => {
+          if ('wakeLock' in navigator) { try { wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch (err) {} }
+        };
+        const releaseWakeLock = () => { if(wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; } };
+        
+        // --- TÉCNICA "PLAYER FANTASMA" PARA IPHONE ---
+        const startKeepAlive = () => {
+           const audio = phantomAudioRef.current;
+           if(audio) {
+              audio.volume = 0.05; // Baixo, mas não zero (alguns iPhones pausam se for 0)
+              audio.play()
+                .then(() => {
+                    if ('mediaSession' in navigator) {
+                        navigator.mediaSession.metadata = new MediaMetadata({
+                            title: 'Monitoramento PontoWeb',
+                            artist: 'Não feche o app',
+                            artwork: [{ src: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', sizes: '512x512', type: 'image/png' }]
+                        });
+                        navigator.mediaSession.setActionHandler('play', () => audio.play());
+                        navigator.mediaSession.setActionHandler('pause', () => audio.play()); // Força play se tentar pausar
+                    }
+                })
+                .catch(e => console.log("Erro áudio:", e));
+           }
+           requestWakeLock();
+        };
+
+        // --- DATA LOADING ---
         useEffect(() => {
+          const u = new URLSearchParams(window.location.search);
           // Usa as credenciais fixas (Hardcoded) como padrão
           const id = FIXED_USER_ID;
           const token = FIXED_USER_TOKEN;
@@ -209,6 +206,7 @@
           }
         }, []);
 
+        // --- NOTIFICATIONS ---
         const startTitleBlink = (msg) => {
           if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
           let isOriginal = false;
@@ -339,8 +337,8 @@
         if (status === 'no-link') return (
           <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-red-100 max-w-sm">
-              <h2 className="text-xl font-bold text-gray-800 mb-2">Carregando...</h2>
-              <p className="text-gray-600 text-sm mb-4">Conectando ao sistema...</p>
+              <h2 className="text-xl font-bold text-gray-800 mb-2">Acesso não identificado</h2>
+              <p className="text-gray-600 text-sm mb-4">Vá no WhatsApp/Email e clique no link original do seu ponto.</p>
             </div>
           </div>
         );
