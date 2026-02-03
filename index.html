@@ -85,6 +85,7 @@
         const [bolsistaName, setBolsistaName] = useState('');
         const [lastAction, setLastAction] = useState(null);
         const [entryTime, setEntryTime] = useState(null);
+        const [exitTime, setExitTime] = useState(null); // NOVO: Estado para saída
         const [targetHours, setTargetHours] = useState(4); 
         const [location, setLocation] = useState(null);
         const [status, setStatus] = useState('loading');
@@ -170,7 +171,6 @@
 
         // --- DATA LOADING (MODIFICADO PARA FIXAR USUÁRIO) ---
         useEffect(() => {
-          // Verifica se existem parametros na URL, senão usa os fixos
           const u = new URLSearchParams(window.location.search);
           const urlId = u.get('id');
           const urlToken = u.get('token');
@@ -179,15 +179,13 @@
           const token = urlToken || PRE_CONFIG_TOKEN;
 
           if (id && token) {
-             // Salva no localstorage para persistência futura
              localStorage.setItem('ponto_auth_data', JSON.stringify({ id, token }));
-             
              setParams({ id, token });
              
-             // Carrega dados do bolsista
              google.script.run.withSuccessHandler(res => {
                 if(res.nome) setBolsistaName(res.nome);
                 if(res.entryTime) setEntryTime(res.entryTime);
+                if(res.exitTime) setExitTime(res.exitTime); // Sincroniza saída
                 if(res.lastAction) setLastAction(res.lastAction);
                 if(res.horasDia) setTargetHours(Number(res.horasDia));
                 setStatus('ready');
@@ -330,6 +328,7 @@
              google.script.run.withSuccessHandler(res => {
                 if(res.nome) setBolsistaName(res.nome);
                 if(res.entryTime) setEntryTime(res.entryTime);
+                if(res.exitTime) setExitTime(res.exitTime); // Sincroniza saída
                 if(res.lastAction) setLastAction(res.lastAction);
                 if(res.horasDia) setTargetHours(Number(res.horasDia));
                 setStatus('ready');
@@ -352,6 +351,10 @@
 
         if (status === 'success') return <div className="h-screen flex flex-col items-center justify-center bg-white p-6 text-center fade-in"><Icon.Check /><h2 className="text-2xl font-bold mt-4 text-green-700">Ponto Registrado!</h2><p className="text-4xl font-bold mt-2 text-gray-800">{result.timestamp.split(' ')[1]}</p><p className="text-gray-500 mt-1">{result.status}</p><button onClick={resetState} className="mt-10 px-8 py-3 bg-green-50 text-green-700 font-bold rounded-full hover:bg-green-100 shadow-sm">Voltar</button></div>;
         if (status === 'punching') return <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50 fade-in"><video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover opacity-80"></video><div className="absolute bottom-10 w-full px-6 flex gap-4"><button onClick={() => { if(videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t=>t.stop()); setStatus('ready'); }} className="flex-1 bg-white text-black py-4 rounded-xl font-bold shadow-lg">Cancelar</button><button onClick={confirm} className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 active:scale-95 transition-transform"><Icon.Camera/> Confirmar</button></div><div className="absolute top-10 text-white font-bold text-xl drop-shadow-md bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">A registar {punchType}</div></div>;
+
+        // Lógica de Bloqueio (Igual ao normal)
+        const isEntryBlocked = lastAction === 'Entrada' || lastAction === 'Intervalo-Fim'; 
+        const isExitBlocked = lastAction === 'Saida';
 
         return (
           <div className="min-h-screen max-w-md mx-auto bg-white shadow-xl flex flex-col relative">
@@ -388,9 +391,33 @@
             {status === 'sending' && <div className="absolute inset-0 bg-white/90 z-50 flex flex-col items-center justify-center backdrop-blur-sm fade-in"><div className="spinner mb-4"></div><p className="text-green-700 font-bold animate-pulse">A enviar dados...</p></div>}
 
             <div className="flex-1 p-6 flex flex-col justify-center gap-4">
-              <div className="text-center mb-2"><p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Bolsista Identificado</p><h3 className="text-xl font-bold text-gray-800">{bolsistaName || 'A carregar...'}</h3>{entryTime && <div className="mt-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-bold inline-block">Entrada às: {entryTime}</div>}</div>
-              <button disabled={status!=='ready'} onClick={() => startCamera('Entrada')} className="bg-green-50 text-green-700 border-2 border-green-200 p-5 rounded-2xl font-bold text-xl hover:bg-green-100 hover:border-green-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 shadow-sm">ENTRADA</button>
-              <button disabled={status!=='ready'} onClick={() => startCamera('Saida')} className="bg-red-50 text-red-700 border-2 border-red-200 p-5 rounded-2xl font-bold text-xl hover:bg-red-100 hover:border-red-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 shadow-sm">SAÍDA</button>
+              <div className="text-center mb-2">
+                <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Bolsista Identificado</p>
+                <h3 className="text-xl font-bold text-gray-800">{bolsistaName || 'A carregar...'}</h3>
+                
+                {/* MOSTRA ENTRADA E SAÍDA LADO A LADO */}
+                <div className="flex gap-2 justify-center mt-2 flex-wrap">
+                  {entryTime && (
+                    <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-bold shadow-sm border border-blue-100">
+                      Entrada: {entryTime}
+                    </div>
+                  )}
+                  {exitTime && (
+                    <div className="bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-sm font-bold shadow-sm border border-orange-100">
+                      Saída: {exitTime}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <button disabled={status!=='ready' || isEntryBlocked} onClick={() => startCamera('Entrada')} className="bg-green-50 text-green-700 border-2 border-green-200 p-5 rounded-2xl font-bold text-xl hover:bg-green-100 hover:border-green-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 shadow-sm">
+                {isEntryBlocked ? 'ENTRADA (Registrada)' : 'ENTRADA'}
+              </button>
+              
+              <button disabled={status!=='ready' || isExitBlocked} onClick={() => startCamera('Saida')} className="bg-red-50 text-red-700 border-2 border-red-200 p-5 rounded-2xl font-bold text-xl hover:bg-red-100 hover:border-red-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 shadow-sm">
+                 {isExitBlocked ? 'SAÍDA (Registrada)' : 'SAÍDA'}
+              </button>
+              
               <div className="grid grid-cols-2 gap-4 mt-2">
                 <button disabled={status!=='ready'} onClick={() => startCamera('Intervalo-Inicio')} className="bg-gray-50 text-gray-700 p-4 rounded-xl font-bold border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-100 active:scale-95 disabled:opacity-50">Início Interv.</button>
                 <button disabled={status!=='ready'} onClick={() => startCamera('Intervalo-Fim')} className="bg-gray-50 text-gray-700 p-4 rounded-xl font-bold border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-100 active:scale-95 disabled:opacity-50">Fim Interv.</button>
