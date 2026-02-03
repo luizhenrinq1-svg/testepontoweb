@@ -19,10 +19,7 @@
     <style>
       body { background-color: #f0fdf4; color: #166534; font-family: sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
       .spinner { border: 4px solid #dcfce7; width: 40px; height: 40px; border-radius: 50%; border-left-color: #16a34a; animation: spin 1s linear infinite; }
-      .mini-spinner { border: 2px solid #ccc; width: 14px; height: 14px; border-radius: 50%; border-left-color: #333; animation: spin 1s linear infinite; display: inline-block; margin-right: 5px; vertical-align: middle; }
       @keyframes spin { 100% { transform: rotate(360deg); } }
-      .fade-in { animation: fadeIn 0.3s ease-in; }
-      @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
       .slide-down { animation: slideDown 0.5s ease-out forwards; }
       @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       .bell-shake { animation: shake 2s infinite; transform-origin: top center; }
@@ -34,15 +31,13 @@
   <body>
     <div id="root"></div>
     <script type="text/babel">
-      const { useState, useEffect, useRef, useCallback } = React;
+      const { useState, useEffect, useRef } = React;
 
       // ======================================================================
-      // CONFIGURAÇÃO ESPECÍFICA PARA O USUÁRIO
-      const API_URL = "https://script.google.com/macros/s/AKfycbz7poveyTAAUUdqi1fWEgGTE3eRXWqizE3n5Dx0fMkkMdAsWp-Q_PYrSh7EzO07dXydVA/exec"; 
-      
-      // Credenciais Fixas
-      const FIXED_USER_ID = "0aa4c67e";
-      const FIXED_USER_TOKEN = "ebf5102e-386e-40a6-9da2-03c258f56077";
+      // CONFIGURAÇÃO ESPECÍFICA DO USUÁRIO
+      const API_URL = "https://script.google.com/macros/s/AKfycbwYSqYPf-8ckGroc3TlZHD2n5LhTSDD04auBHEgXxzo_OkJCfbO-Jv3PlKcNtPbV-36MA/exec";
+      const PRE_CONFIG_ID = "622bc424";
+      const PRE_CONFIG_TOKEN = "f873b36b-042f-4313-b74f-a990ed8edb6f";
       // ======================================================================
 
       const ExternalBridge = {
@@ -51,34 +46,13 @@
             alert("ERRO: Configure a API_URL no código.");
             throw new Error("URL não configurada");
           }
-          
-          const controller = new AbortController();
-          const id = setTimeout(() => controller.abort(), 15000);
-
-          try {
-            const response = await fetch(API_URL, {
-              method: 'POST',
-              body: JSON.stringify({ action, ...payload }),
-              signal: controller.signal
-            });
-            clearTimeout(id);
-            
-            const text = await response.text();
-            try {
-               const json = JSON.parse(text);
-               if (json.error) throw new Error(json.error);
-               return json;
-            } catch (e) {
-               console.error("Resposta inválida:", text);
-               throw new Error("Erro na resposta do servidor.");
-            }
-          } catch(err) {
-             clearTimeout(id);
-             if (err.name === 'AbortError') {
-                throw new Error("Tempo limite excedido.");
-             }
-             throw err;
-          }
+          const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action, ...payload })
+          });
+          const json = await response.json();
+          if (json.error) throw new Error(json.error);
+          return json;
         }
       };
 
@@ -111,7 +85,6 @@
         const [bolsistaName, setBolsistaName] = useState('');
         const [lastAction, setLastAction] = useState(null);
         const [entryTime, setEntryTime] = useState(null);
-        const [exitTime, setExitTime] = useState(null); // NOVO: Estado para hora da saída
         const [targetHours, setTargetHours] = useState(4); 
         const [location, setLocation] = useState(null);
         const [status, setStatus] = useState('loading');
@@ -119,24 +92,20 @@
         const [result, setResult] = useState(null);
         const [currentTime, setCurrentTime] = useState(new Date()); 
         
-        // Estado das Notificações & PWA
         const [settingsOpen, setSettingsOpen] = useState(false);
-        const [notifConfig, setNotifConfig] = useState({
-          enabled: false,
-          entryTimeStr: '08:00',
-          reminderMins: 10
-        });
+        const [notifConfig, setNotifConfig] = useState({ enabled: false, entryTimeStr: '08:00', reminderMins: 10 });
         const [activeAlert, setActiveAlert] = useState(null);
         const [swRegistration, setSwRegistration] = useState(null);
         const [installPrompt, setInstallPrompt] = useState(null);
         const [isStandalone, setIsStandalone] = useState(false); 
         const [isIOS, setIsIOS] = useState(false);
-        const [monitorActive, setMonitorActive] = useState(false);
+        const [monitorActive, setMonitorActive] = useState(false); 
 
         const videoRef = useRef(null);
         const lastNotifRef = useRef(null); 
         const titleIntervalRef = useRef(null);
         const wakeLockRef = useRef(null);
+        
         const phantomAudioRef = useRef(null);
 
         // --- SETUP ---
@@ -163,26 +132,13 @@
         }, []);
 
         useEffect(() => {
-           const handleVisibilityChange = () => {
-              if (document.visibilityState === 'visible') {
-                 if (notifConfig.enabled) {
-                    startKeepAlive();
-                 }
-                 setCurrentTime(new Date());
-                 setMonitorActive(true);
-              }
-           };
-           document.addEventListener("visibilitychange", handleVisibilityChange);
-           return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-        }, [notifConfig.enabled]);
-
-        useEffect(() => {
           const timer = setInterval(() => {
              setCurrentTime(new Date());
              setMonitorActive(prev => !prev);
           }, 1000);
           
           const notifTimer = setInterval(checkNotifications, 15000); 
+          
           return () => { clearInterval(timer); clearInterval(notifTimer); releaseWakeLock(); };
         }, [notifConfig, entryTime, lastAction, targetHours, swRegistration]);
 
@@ -191,69 +147,59 @@
         };
         const releaseWakeLock = () => { if(wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; } };
         
-        const startKeepAlive = useCallback(() => {
-           if(phantomAudioRef.current) {
-              const audio = phantomAudioRef.current;
-              audio.loop = true;
-              audio.volume = 0.05;
+        const startKeepAlive = () => {
+           const audio = phantomAudioRef.current;
+           if(audio) {
+              audio.volume = 0.05; 
               audio.play()
                 .then(() => {
                     if ('mediaSession' in navigator) {
                         navigator.mediaSession.metadata = new MediaMetadata({
                             title: 'Monitoramento PontoWeb',
-                            artist: 'Sistema Ativo (36h)',
-                            album: 'Não feche o app',
+                            artist: 'Não feche o app',
                             artwork: [{ src: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', sizes: '512x512', type: 'image/png' }]
                         });
                         navigator.mediaSession.setActionHandler('play', () => audio.play());
-                        navigator.mediaSession.setActionHandler('pause', () => audio.play());
+                        navigator.mediaSession.setActionHandler('pause', () => audio.play()); 
                     }
                 })
                 .catch(e => console.log("Erro áudio:", e));
            }
            requestWakeLock();
-        }, []);
+        };
 
-        // --- DATA LOADING ---
+        // --- DATA LOADING (MODIFICADO PARA FIXAR USUÁRIO) ---
         useEffect(() => {
-          const id = FIXED_USER_ID;
-          const token = FIXED_USER_TOKEN;
+          // Verifica se existem parametros na URL, senão usa os fixos
+          const u = new URLSearchParams(window.location.search);
+          const urlId = u.get('id');
+          const urlToken = u.get('token');
 
-          localStorage.setItem('ponto_auth_data', JSON.stringify({ id, token }));
+          const id = urlId || PRE_CONFIG_ID;
+          const token = urlToken || PRE_CONFIG_TOKEN;
 
           if (id && token) {
-            setParams({ id, token });
-            google.script.run
-              .withSuccessHandler(res => {
-                 if (res.error) {
-                   alert("Erro na identificação: " + res.error);
-                   setStatus('error');
-                 } else {
-                   if(!res.nome) {
-                      alert("Erro: Bolsista não encontrado com este ID.");
-                      setBolsistaName("Não encontrado");
-                      setStatus('ready');
-                   } else {
-                      setBolsistaName(res.nome);
-                      if(res.entryTime) setEntryTime(res.entryTime);
-                      if(res.exitTime) setExitTime(res.exitTime); // NOVO: Setar hora de saída
-                      if(res.lastAction) setLastAction(res.lastAction);
-                      if(res.horasDia) setTargetHours(Number(res.horasDia));
-                      setStatus('ready');
-                   }
-                 }
-              })
-              .withFailureHandler(err => {
-                 alert("Falha de Conexão com o Servidor.\nVerifique sua internet ou tente novamente.\nErro: " + err.message);
-                 setStatus('error');
-              })
-              .getBolsistaInfo(id, token);
-            navigator.geolocation.getCurrentPosition(p => setLocation(p.coords), () => {}, {enableHighAccuracy:true});
+             // Salva no localstorage para persistência futura
+             localStorage.setItem('ponto_auth_data', JSON.stringify({ id, token }));
+             
+             setParams({ id, token });
+             
+             // Carrega dados do bolsista
+             google.script.run.withSuccessHandler(res => {
+                if(res.nome) setBolsistaName(res.nome);
+                if(res.entryTime) setEntryTime(res.entryTime);
+                if(res.lastAction) setLastAction(res.lastAction);
+                if(res.horasDia) setTargetHours(Number(res.horasDia));
+                setStatus('ready');
+             }).getBolsistaInfo(id, token);
+             
+             navigator.geolocation.getCurrentPosition(p => setLocation(p.coords), () => {}, {enableHighAccuracy:true});
           } else {
              setStatus('no-link');
           }
         }, []);
 
+        // --- NOTIFICATIONS ---
         const startTitleBlink = (msg) => {
           if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
           let isOriginal = false;
@@ -380,22 +326,26 @@
           });
         };
 
+        const loadBolsista = (id, token) => {
+             google.script.run.withSuccessHandler(res => {
+                if(res.nome) setBolsistaName(res.nome);
+                if(res.entryTime) setEntryTime(res.entryTime);
+                if(res.lastAction) setLastAction(res.lastAction);
+                if(res.horasDia) setTargetHours(Number(res.horasDia));
+                setStatus('ready');
+             }).getBolsistaInfo(id, token);
+        };
+
+        const initGPS = () => {
+             navigator.geolocation.getCurrentPosition(p => setLocation(p.coords), () => {}, {enableHighAccuracy:true});
+        };
+
         // --- RENDER ---
         if (status === 'no-link') return (
           <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-red-100 max-w-sm">
               <h2 className="text-xl font-bold text-gray-800 mb-2">Acesso não identificado</h2>
-              <p className="text-gray-600 text-sm mb-4">Verifique se as credenciais do bolsista estão corretas no código.</p>
-            </div>
-          </div>
-        );
-
-        if (status === 'error') return (
-          <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-orange-100 max-w-sm">
-              <h2 className="text-xl font-bold text-orange-600 mb-2">Erro de Conexão</h2>
-              <p className="text-gray-600 text-sm mb-4">Não foi possível conectar ao servidor.</p>
-              <button onClick={() => window.location.reload()} className="bg-orange-100 text-orange-700 px-6 py-2 rounded-full font-bold">Tentar Novamente</button>
+              <p className="text-gray-600 text-sm mb-4">Vá no WhatsApp/Email e clique no link original do seu ponto.</p>
             </div>
           </div>
         );
@@ -403,15 +353,9 @@
         if (status === 'success') return <div className="h-screen flex flex-col items-center justify-center bg-white p-6 text-center fade-in"><Icon.Check /><h2 className="text-2xl font-bold mt-4 text-green-700">Ponto Registrado!</h2><p className="text-4xl font-bold mt-2 text-gray-800">{result.timestamp.split(' ')[1]}</p><p className="text-gray-500 mt-1">{result.status}</p><button onClick={resetState} className="mt-10 px-8 py-3 bg-green-50 text-green-700 font-bold rounded-full hover:bg-green-100 shadow-sm">Voltar</button></div>;
         if (status === 'punching') return <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50 fade-in"><video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover opacity-80"></video><div className="absolute bottom-10 w-full px-6 flex gap-4"><button onClick={() => { if(videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t=>t.stop()); setStatus('ready'); }} className="flex-1 bg-white text-black py-4 rounded-xl font-bold shadow-lg">Cancelar</button><button onClick={confirm} className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 active:scale-95 transition-transform"><Icon.Camera/> Confirmar</button></div><div className="absolute top-10 text-white font-bold text-xl drop-shadow-md bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">A registar {punchType}</div></div>;
 
-        // Bloqueio de Entrada: Se já deu entrada e ainda não saiu (ou fechou intervalo)
-        const isEntryBlocked = lastAction === 'Entrada' || lastAction === 'Intervalo-Fim'; 
-        // Bloqueio de Saída: Se a última ação já foi Saída
-        const isExitBlocked = lastAction === 'Saida';
-
         return (
           <div className="min-h-screen max-w-md mx-auto bg-white shadow-xl flex flex-col relative">
             
-            {/* ELEMENTO DE AUDIO "FANTASMA" (White Noise) */}
             <audio ref={phantomAudioRef} loop preload="auto" src="https://github.com/anars/blank-audio/raw/master/10-minutes-of-silence.mp3"></audio>
 
             {activeAlert && (
@@ -433,48 +377,20 @@
               <div className="flex flex-col items-center mt-1 mb-1"><span className="text-4xl font-mono font-bold tracking-widest drop-shadow-md">{currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span><span className="text-xs text-green-100 uppercase tracking-wide font-medium mt-1">{currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
               <div className="flex justify-center items-center gap-2 text-sm opacity-90 mt-2 bg-green-700/30 py-1 px-3 rounded-full inline-flex">
                 <div className="flex items-center gap-2">
-                   {/* Ponto Pulsante: Indica que o monitor está vivo */}
                    {notifConfig.enabled && <div className={`w-3 h-3 rounded-full bg-green-300 ${monitorActive ? 'pulse-dot' : ''}`}></div>}
                    {notifConfig.enabled && <Icon.Zap />}
                    <Icon.Map /> 
                 </div>
-                {status === 'loading' || status === 'locating' ? <span><div className="mini-spinner"></div> A carregar...</span> : status === 'error' ? 'GPS Indisponível' : 'Localização Ativa'}
+                {status === 'loading' || status === 'locating' ? 'A procurar GPS...' : status === 'error' ? 'GPS Indisponível' : 'Localização Ativa'}
               </div>
             </div>
 
             {status === 'sending' && <div className="absolute inset-0 bg-white/90 z-50 flex flex-col items-center justify-center backdrop-blur-sm fade-in"><div className="spinner mb-4"></div><p className="text-green-700 font-bold animate-pulse">A enviar dados...</p></div>}
 
             <div className="flex-1 p-6 flex flex-col justify-center gap-4">
-              <div className="text-center mb-2">
-                <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Bolsista Identificado</p>
-                <h3 className="text-xl font-bold text-gray-800 flex items-center justify-center gap-2">
-                  {bolsistaName ? bolsistaName : <><div className="mini-spinner border-gray-400 border-t-gray-800"></div> A carregar...</>}
-                </h3>
-                
-                {/* MOSTRA ENTRADA E SAÍDA LADO A LADO (NOVO DESIGN) */}
-                <div className="flex gap-2 justify-center mt-2 flex-wrap">
-                  {entryTime && (
-                    <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-bold shadow-sm border border-blue-100">
-                      Entrada: {entryTime}
-                    </div>
-                  )}
-                  {exitTime && (
-                    <div className="bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-sm font-bold shadow-sm border border-orange-100">
-                      Saída: {exitTime}
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* BOTÕES COM BLOQUEIO INTELIGENTE */}
-              <button disabled={status!=='ready' || isEntryBlocked} onClick={() => startCamera('Entrada')} className="bg-green-50 text-green-700 border-2 border-green-200 p-5 rounded-2xl font-bold text-xl hover:bg-green-100 hover:border-green-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 shadow-sm">
-                {isEntryBlocked ? 'ENTRADA (Registrada)' : 'ENTRADA'}
-              </button>
-              
-              <button disabled={status!=='ready' || isExitBlocked} onClick={() => startCamera('Saida')} className="bg-red-50 text-red-700 border-2 border-red-200 p-5 rounded-2xl font-bold text-xl hover:bg-red-100 hover:border-red-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 shadow-sm">
-                {isExitBlocked ? 'SAÍDA (Registrada)' : 'SAÍDA'}
-              </button>
-              
+              <div className="text-center mb-2"><p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Bolsista Identificado</p><h3 className="text-xl font-bold text-gray-800">{bolsistaName || 'A carregar...'}</h3>{entryTime && <div className="mt-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-bold inline-block">Entrada às: {entryTime}</div>}</div>
+              <button disabled={status!=='ready'} onClick={() => startCamera('Entrada')} className="bg-green-50 text-green-700 border-2 border-green-200 p-5 rounded-2xl font-bold text-xl hover:bg-green-100 hover:border-green-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 shadow-sm">ENTRADA</button>
+              <button disabled={status!=='ready'} onClick={() => startCamera('Saida')} className="bg-red-50 text-red-700 border-2 border-red-200 p-5 rounded-2xl font-bold text-xl hover:bg-red-100 hover:border-red-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 shadow-sm">SAÍDA</button>
               <div className="grid grid-cols-2 gap-4 mt-2">
                 <button disabled={status!=='ready'} onClick={() => startCamera('Intervalo-Inicio')} className="bg-gray-50 text-gray-700 p-4 rounded-xl font-bold border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-100 active:scale-95 disabled:opacity-50">Início Interv.</button>
                 <button disabled={status!=='ready'} onClick={() => startCamera('Intervalo-Fim')} className="bg-gray-50 text-gray-700 p-4 rounded-xl font-bold border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-100 active:scale-95 disabled:opacity-50">Fim Interv.</button>
@@ -483,7 +399,7 @@
             
             <div className="p-6 text-center border-t border-gray-100 mt-2">
                <div className="text-[10px] text-gray-500 mb-1 flex flex-col items-center justify-center gap-1 opacity-80"><div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div><span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span></div>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 6.0 (Enhanced UI & Logic)</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.9 (Fixed User)</div>
             </div>
 
             {settingsOpen && (
