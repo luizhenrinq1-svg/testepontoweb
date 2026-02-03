@@ -50,13 +50,24 @@
             alert("ERRO: Configure a API_URL no código.");
             throw new Error("URL não configurada");
           }
-          const response = await fetch(API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action, ...payload })
-          });
-          const json = await response.json();
-          if (json.error) throw new Error(json.error);
-          return json;
+          try {
+            const response = await fetch(API_URL, {
+              method: 'POST',
+              body: JSON.stringify({ action, ...payload })
+            });
+            const text = await response.text();
+            // Tenta fazer o parse do JSON, se falhar, mostra o erro original
+            try {
+               const json = JSON.parse(text);
+               if (json.error) throw new Error(json.error);
+               return json;
+            } catch (e) {
+               console.error("Resposta inválida:", text);
+               throw new Error("Erro na resposta do servidor (JSON inválido). Verifique o console.");
+            }
+          } catch(err) {
+             throw err;
+          }
         }
       };
 
@@ -114,8 +125,6 @@
         const lastNotifRef = useRef(null); 
         const titleIntervalRef = useRef(null);
         const wakeLockRef = useRef(null);
-        
-        // CORREÇÃO: Declarando a referência que estava faltando
         const phantomAudioRef = useRef(null);
 
         // --- SETUP ---
@@ -145,7 +154,6 @@
           // Loop principal do relógio
           const timer = setInterval(() => {
              setCurrentTime(new Date());
-             // Feedback visual de que o monitor está rodando
              setMonitorActive(prev => !prev);
           }, 1000);
           
@@ -160,53 +168,76 @@
         const releaseWakeLock = () => { if(wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; } };
         
         // --- TÉCNICA "PLAYER FANTASMA" PARA IPHONE ---
-        const startKeepAlive = () => {
-           const audio = phantomAudioRef.current;
-           if(audio) {
-              audio.volume = 0.05; // Baixo, mas não zero (alguns iPhones pausam se for 0)
+        const startKeepAlive = useCallback(() => {
+           if(phantomAudioRef.current) {
+              const audio = phantomAudioRef.current;
+              audio.loop = true;
+              audio.volume = 0.05;
               audio.play()
                 .then(() => {
                     if ('mediaSession' in navigator) {
                         navigator.mediaSession.metadata = new MediaMetadata({
                             title: 'Monitoramento PontoWeb',
-                            artist: 'Não feche o app',
+                            artist: 'Sistema Ativo (36h)',
+                            album: 'Não feche o app',
                             artwork: [{ src: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', sizes: '512x512', type: 'image/png' }]
                         });
                         navigator.mediaSession.setActionHandler('play', () => audio.play());
-                        navigator.mediaSession.setActionHandler('pause', () => audio.play()); // Força play se tentar pausar
+                        navigator.mediaSession.setActionHandler('pause', () => audio.play());
                     }
                 })
                 .catch(e => console.log("Erro áudio:", e));
            }
            requestWakeLock();
-        };
+        }, []);
 
-        // --- DATA LOADING ---
         useEffect(() => {
-          const u = new URLSearchParams(window.location.search);
-          // Usa as credenciais fixas (Hardcoded) como padrão
+           const handleVisibilityChange = () => {
+              if (document.visibilityState === 'visible') {
+                 if (notifConfig.enabled) {
+                    startKeepAlive();
+                 }
+                 setCurrentTime(new Date());
+                 setMonitorActive(true);
+              }
+           };
+           document.addEventListener("visibilitychange", handleVisibilityChange);
+           return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+        }, [notifConfig.enabled, startKeepAlive]);
+
+        // --- DATA LOADING (MODIFICADO PARA USUÁRIO ESPECÍFICO) ---
+        useEffect(() => {
           const id = FIXED_USER_ID;
           const token = FIXED_USER_TOKEN;
 
-          // Salva na memória para garantir consistência
           localStorage.setItem('ponto_auth_data', JSON.stringify({ id, token }));
 
           if (id && token) {
             setParams({ id, token });
-            google.script.run.withSuccessHandler(res => {
-               if(res.nome) setBolsistaName(res.nome);
-               if(res.entryTime) setEntryTime(res.entryTime);
-               if(res.lastAction) setLastAction(res.lastAction);
-               if(res.horasDia) setTargetHours(Number(res.horasDia));
-               setStatus('ready');
-            }).getBolsistaInfo(id, token);
+            google.script.run
+              .withSuccessHandler(res => {
+                 if (res.error) {
+                   alert("Erro na identificação: " + res.error);
+                   setStatus('error');
+                 } else {
+                   if(res.nome) setBolsistaName(res.nome);
+                   if(res.entryTime) setEntryTime(res.entryTime);
+                   if(res.lastAction) setLastAction(res.lastAction);
+                   if(res.horasDia) setTargetHours(Number(res.horasDia));
+                   setStatus('ready');
+                 }
+              })
+              .withFailureHandler(err => {
+                 alert("Falha de Conexão com o Servidor.\nVerifique sua internet ou tente novamente.\nErro: " + err.message);
+                 setStatus('error');
+              })
+              .getBolsistaInfo(id, token);
             navigator.geolocation.getCurrentPosition(p => setLocation(p.coords), () => {}, {enableHighAccuracy:true});
           } else {
              setStatus('no-link');
           }
         }, []);
 
-        // --- NOTIFICATIONS ---
         const startTitleBlink = (msg) => {
           if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
           let isOriginal = false;
@@ -338,7 +369,17 @@
           <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-red-100 max-w-sm">
               <h2 className="text-xl font-bold text-gray-800 mb-2">Acesso não identificado</h2>
-              <p className="text-gray-600 text-sm mb-4">Vá no WhatsApp/Email e clique no link original do seu ponto.</p>
+              <p className="text-gray-600 text-sm mb-4">Verifique se as credenciais do bolsista estão corretas no código.</p>
+            </div>
+          </div>
+        );
+
+        if (status === 'error') return (
+          <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
+            <div className="bg-white p-6 rounded-2xl shadow-lg border border-orange-100 max-w-sm">
+              <h2 className="text-xl font-bold text-orange-600 mb-2">Erro de Conexão</h2>
+              <p className="text-gray-600 text-sm mb-4">Não foi possível conectar ao servidor.</p>
+              <button onClick={() => window.location.reload()} className="bg-orange-100 text-orange-700 px-6 py-2 rounded-full font-bold">Tentar Novamente</button>
             </div>
           </div>
         );
@@ -394,7 +435,7 @@
             
             <div className="p-6 text-center border-t border-gray-100 mt-2">
                <div className="text-[10px] text-gray-500 mb-1 flex flex-col items-center justify-center gap-1 opacity-80"><div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div><span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span></div>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 5.1 (Fixed User)</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 5.2 (Fixed User + Error Handling)</div>
             </div>
 
             {settingsOpen && (
