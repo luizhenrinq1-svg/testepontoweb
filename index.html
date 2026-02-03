@@ -19,6 +19,7 @@
     <style>
       body { background-color: #f0fdf4; color: #166534; font-family: sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
       .spinner { border: 4px solid #dcfce7; width: 40px; height: 40px; border-radius: 50%; border-left-color: #16a34a; animation: spin 1s linear infinite; }
+      .mini-spinner { border: 2px solid #ccc; width: 14px; height: 14px; border-radius: 50%; border-left-color: #333; animation: spin 1s linear infinite; display: inline-block; margin-right: 5px; vertical-align: middle; }
       @keyframes spin { 100% { transform: rotate(360deg); } }
       .fade-in { animation: fadeIn 0.3s ease-in; }
       @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
@@ -39,7 +40,7 @@
       // CONFIGURAÇÃO ESPECÍFICA PARA O USUÁRIO
       const API_URL = "https://script.google.com/macros/s/AKfycbwYSqYPf-8ckGroc3TlZHD2n5LhTSDD04auBHEgXxzo_OkJCfbO-Jv3PlKcNtPbV-36MA/exec"; 
       
-      // Credenciais Fixas (Hardcoded)
+      // Credenciais Fixas
       const FIXED_USER_ID = "622bc424";
       const FIXED_USER_TOKEN = "f873b36b-042f-4313-b74f-a990ed8edb6f";
       // ======================================================================
@@ -50,22 +51,33 @@
             alert("ERRO: Configure a API_URL no código.");
             throw new Error("URL não configurada");
           }
+          
+          // Adicionado Timeout de 15 segundos para não ficar "A carregar..." infinitamente
+          const controller = new AbortController();
+          const id = setTimeout(() => controller.abort(), 15000);
+
           try {
             const response = await fetch(API_URL, {
               method: 'POST',
-              body: JSON.stringify({ action, ...payload })
+              body: JSON.stringify({ action, ...payload }),
+              signal: controller.signal
             });
+            clearTimeout(id);
+            
             const text = await response.text();
-            // Tenta fazer o parse do JSON, se falhar, mostra o erro original
             try {
                const json = JSON.parse(text);
                if (json.error) throw new Error(json.error);
                return json;
             } catch (e) {
                console.error("Resposta inválida:", text);
-               throw new Error("Erro na resposta do servidor (JSON inválido). Verifique o console.");
+               throw new Error("Erro na resposta do servidor (JSON inválido).");
             }
           } catch(err) {
+             clearTimeout(id);
+             if (err.name === 'AbortError') {
+                throw new Error("Tempo limite excedido. Verifique sua conexão.");
+             }
              throw err;
           }
         }
@@ -107,13 +119,8 @@
         const [result, setResult] = useState(null);
         const [currentTime, setCurrentTime] = useState(new Date()); 
         
-        // Estado das Notificações & PWA
         const [settingsOpen, setSettingsOpen] = useState(false);
-        const [notifConfig, setNotifConfig] = useState({
-          enabled: false,
-          entryTimeStr: '08:00',
-          reminderMins: 10
-        });
+        const [notifConfig, setNotifConfig] = useState({ enabled: false, entryTimeStr: '08:00', reminderMins: 10 });
         const [activeAlert, setActiveAlert] = useState(null);
         const [swRegistration, setSwRegistration] = useState(null);
         const [installPrompt, setInstallPrompt] = useState(null);
@@ -220,11 +227,18 @@
                    alert("Erro na identificação: " + res.error);
                    setStatus('error');
                  } else {
-                   if(res.nome) setBolsistaName(res.nome);
-                   if(res.entryTime) setEntryTime(res.entryTime);
-                   if(res.lastAction) setLastAction(res.lastAction);
-                   if(res.horasDia) setTargetHours(Number(res.horasDia));
-                   setStatus('ready');
+                   // Validação de nome vazio
+                   if(!res.nome) {
+                      alert("Erro: Bolsista não encontrado com este ID.");
+                      setBolsistaName("Não encontrado");
+                      setStatus('ready');
+                   } else {
+                      setBolsistaName(res.nome);
+                      if(res.entryTime) setEntryTime(res.entryTime);
+                      if(res.lastAction) setLastAction(res.lastAction);
+                      if(res.horasDia) setTargetHours(Number(res.horasDia));
+                      setStatus('ready');
+                   }
                  }
               })
               .withFailureHandler(err => {
@@ -378,7 +392,7 @@
           <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-orange-100 max-w-sm">
               <h2 className="text-xl font-bold text-orange-600 mb-2">Erro de Conexão</h2>
-              <p className="text-gray-600 text-sm mb-4">Não foi possível conectar ao servidor.</p>
+              <p className="text-gray-600 text-sm mb-4">Não foi possível conectar ao servidor. Tente atualizar a página.</p>
               <button onClick={() => window.location.reload()} className="bg-orange-100 text-orange-700 px-6 py-2 rounded-full font-bold">Tentar Novamente</button>
             </div>
           </div>
@@ -417,14 +431,21 @@
                    {notifConfig.enabled && <Icon.Zap />}
                    <Icon.Map /> 
                 </div>
-                {status === 'loading' || status === 'locating' ? 'A procurar GPS...' : status === 'error' ? 'GPS Indisponível' : 'Localização Ativa'}
+                {status === 'loading' || status === 'locating' ? <span><div className="mini-spinner"></div> A carregar...</span> : status === 'error' ? 'GPS Indisponível' : 'Localização Ativa'}
               </div>
             </div>
 
             {status === 'sending' && <div className="absolute inset-0 bg-white/90 z-50 flex flex-col items-center justify-center backdrop-blur-sm fade-in"><div className="spinner mb-4"></div><p className="text-green-700 font-bold animate-pulse">A enviar dados...</p></div>}
 
             <div className="flex-1 p-6 flex flex-col justify-center gap-4">
-              <div className="text-center mb-2"><p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Bolsista Identificado</p><h3 className="text-xl font-bold text-gray-800">{bolsistaName || 'A carregar...'}</h3>{entryTime && <div className="mt-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-bold inline-block">Entrada às: {entryTime}</div>}</div>
+              <div className="text-center mb-2">
+                <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Bolsista Identificado</p>
+                <h3 className="text-xl font-bold text-gray-800 flex items-center justify-center gap-2">
+                  {bolsistaName ? bolsistaName : <><div className="mini-spinner border-gray-400 border-t-gray-800"></div> A carregar...</>}
+                </h3>
+                {entryTime && <div className="mt-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-bold inline-block">Entrada às: {entryTime}</div>}
+              </div>
+              
               <button disabled={status!=='ready'} onClick={() => startCamera('Entrada')} className="bg-green-50 text-green-700 border-2 border-green-200 p-5 rounded-2xl font-bold text-xl hover:bg-green-100 hover:border-green-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 shadow-sm">ENTRADA</button>
               <button disabled={status!=='ready'} onClick={() => startCamera('Saida')} className="bg-red-50 text-red-700 border-2 border-red-200 p-5 rounded-2xl font-bold text-xl hover:bg-red-100 hover:border-red-300 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 shadow-sm">SAÍDA</button>
               <div className="grid grid-cols-2 gap-4 mt-2">
@@ -435,7 +456,7 @@
             
             <div className="p-6 text-center border-t border-gray-100 mt-2">
                <div className="text-[10px] text-gray-500 mb-1 flex flex-col items-center justify-center gap-1 opacity-80"><div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div><span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span></div>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 5.2 (Fixed User + Error Handling)</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 5.3 (Connection Fix)</div>
             </div>
 
             {settingsOpen && (
