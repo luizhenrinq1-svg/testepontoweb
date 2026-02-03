@@ -20,6 +20,8 @@
       body { background-color: #f0fdf4; color: #166534; font-family: sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
       .spinner { border: 4px solid #dcfce7; width: 40px; height: 40px; border-radius: 50%; border-left-color: #16a34a; animation: spin 1s linear infinite; }
       @keyframes spin { 100% { transform: rotate(360deg); } }
+      .fade-in { animation: fadeIn 0.3s ease-in; }
+      @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
       .slide-down { animation: slideDown 0.5s ease-out forwards; }
       @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       .bell-shake { animation: shake 2s infinite; transform-origin: top center; }
@@ -31,11 +33,15 @@
   <body>
     <div id="root"></div>
     <script type="text/babel">
-      const { useState, useEffect, useRef } = React;
+      const { useState, useEffect, useRef, useCallback } = React;
 
       // ======================================================================
-      // CONFIGURAÇÃO
-      const API_URL = "https://script.google.com/macros/s/AKfycbz7poveyTAAUUdqi1fWEgGTE3eRXWqizE3n5Dx0fMkkMdAsWp-Q_PYrSh7EzO07dXydVA/exec"; 
+      // CONFIGURAÇÃO ESPECÍFICA PARA O USUÁRIO
+      const API_URL = "https://script.google.com/macros/s/AKfycbwYSqYPf-8ckGroc3TlZHD2n5LhTSDD04auBHEgXxzo_OkJCfbO-Jv3PlKcNtPbV-36MA/exec"; 
+      
+      // Credenciais Fixas (Hardcoded)
+      const FIXED_USER_ID = "622bc424";
+      const FIXED_USER_TOKEN = "f873b36b-042f-4313-b74f-a990ed8edb6f";
       // ======================================================================
 
       const ExternalBridge = {
@@ -97,20 +103,48 @@
         const [installPrompt, setInstallPrompt] = useState(null);
         const [isStandalone, setIsStandalone] = useState(false); 
         const [isIOS, setIsIOS] = useState(false);
-        const [monitorActive, setMonitorActive] = useState(false); // Feedback visual do monitor
+        const [monitorActive, setMonitorActive] = useState(false);
 
         const videoRef = useRef(null);
         const lastNotifRef = useRef(null); 
         const titleIntervalRef = useRef(null);
         const wakeLockRef = useRef(null);
-        
-        // Elemento de áudio "Fantasma" - Essencial para o iPhone
-        const phantomAudioRef = useRef(null);
+        const silentAudioRef = useRef(null);
 
-        // --- SETUP ---
+        const requestWakeLock = async () => {
+          if ('wakeLock' in navigator) { try { wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch (err) {} }
+        };
+        const releaseWakeLock = () => { if(wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; } };
+
+        const startKeepAlive = useCallback(() => {
+           if(silentAudioRef.current) {
+              silentAudioRef.current.loop = true;
+              silentAudioRef.current.volume = 0.05;
+              silentAudioRef.current.play()
+                .then(() => {
+                    if ('mediaSession' in navigator) {
+                        navigator.mediaSession.metadata = new MediaMetadata({
+                            title: 'Monitoramento PontoWeb',
+                            artist: 'Sistema Ativo (36h)',
+                            album: 'Não feche o app',
+                            artwork: [{ src: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', sizes: '512x512', type: 'image/png' }]
+                        });
+                        navigator.mediaSession.setActionHandler('play', () => silentAudioRef.current.play());
+                        navigator.mediaSession.setActionHandler('pause', () => silentAudioRef.current.play());
+                    }
+                })
+                .catch(e => console.log("Erro ao iniciar áudio:", e));
+           }
+           requestWakeLock();
+        }, []);
+
         useEffect(() => {
           const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
           setIsIOS(iOS);
+
+          const audio = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVMAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAVrGhAAAAAAAAAAAAAAAAAAAAAP/7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABYaW5nAAAADwAAAAQAAAEgOTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5//uQZAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAABDQEAAAMAAABPAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//7kGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB");
+          audio.loop = true;
+          silentAudioRef.current = audio;
 
           const saved = localStorage.getItem('pontoWebConfig');
           if (saved) {
@@ -131,61 +165,37 @@
         }, []);
 
         useEffect(() => {
-          // Loop principal do relógio
+           const handleVisibilityChange = () => {
+              if (document.visibilityState === 'visible') {
+                 if (notifConfig.enabled) {
+                    startKeepAlive();
+                 }
+                 setCurrentTime(new Date());
+                 setMonitorActive(true);
+              }
+           };
+           document.addEventListener("visibilitychange", handleVisibilityChange);
+           return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+        }, [notifConfig.enabled, startKeepAlive]);
+
+        useEffect(() => {
           const timer = setInterval(() => {
              setCurrentTime(new Date());
-             // Feedback visual de que o monitor está rodando
              setMonitorActive(prev => !prev);
           }, 1000);
           
           const notifTimer = setInterval(checkNotifications, 15000); 
-          
           return () => { clearInterval(timer); clearInterval(notifTimer); releaseWakeLock(); };
         }, [notifConfig, entryTime, lastAction, targetHours, swRegistration]);
 
-        const requestWakeLock = async () => {
-          if ('wakeLock' in navigator) { try { wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch (err) {} }
-        };
-        const releaseWakeLock = () => { if(wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; } };
-        
-        // --- TÉCNICA "PLAYER FANTASMA" PARA IPHONE ---
-        const startKeepAlive = () => {
-           const audio = phantomAudioRef.current;
-           if(audio) {
-              audio.volume = 0.05; // Baixo, mas não zero (alguns iPhones pausam se for 0)
-              audio.play()
-                .then(() => {
-                    if ('mediaSession' in navigator) {
-                        navigator.mediaSession.metadata = new MediaMetadata({
-                            title: 'Monitoramento PontoWeb',
-                            artist: 'Não feche o app',
-                            artwork: [{ src: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png', sizes: '512x512', type: 'image/png' }]
-                        });
-                        navigator.mediaSession.setActionHandler('play', () => audio.play());
-                        navigator.mediaSession.setActionHandler('pause', () => audio.play()); // Força play se tentar pausar
-                    }
-                })
-                .catch(e => console.log("Erro áudio:", e));
-           }
-           requestWakeLock();
-        };
-
-        // --- DATA LOADING ---
+        // --- DATA LOADING (MODIFICADO PARA USUÁRIO ESPECÍFICO) ---
         useEffect(() => {
-          const u = new URLSearchParams(window.location.search);
-          let id = u.get('id');
-          let token = u.get('token');
+          // Usa as credenciais fixas (Hardcoded) como padrão
+          const id = FIXED_USER_ID;
+          const token = FIXED_USER_TOKEN;
 
-          if (id && token) {
-             localStorage.setItem('ponto_auth_data', JSON.stringify({ id, token }));
-          } else {
-             const savedAuth = localStorage.getItem('ponto_auth_data');
-             if (savedAuth) {
-                const auth = JSON.parse(savedAuth);
-                id = auth.id;
-                token = auth.token;
-             }
-          }
+          // Salva na memória para garantir consistência
+          localStorage.setItem('ponto_auth_data', JSON.stringify({ id, token }));
 
           if (id && token) {
             setParams({ id, token });
@@ -202,7 +212,6 @@
           }
         }, []);
 
-        // --- NOTIFICATIONS ---
         const startTitleBlink = (msg) => {
           if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
           let isOriginal = false;
@@ -333,8 +342,8 @@
         if (status === 'no-link') return (
           <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-red-100 max-w-sm">
-              <h2 className="text-xl font-bold text-gray-800 mb-2">Acesso não identificado</h2>
-              <p className="text-gray-600 text-sm mb-4">Vá no WhatsApp/Email e clique no link original do seu ponto.</p>
+              <h2 className="text-xl font-bold text-gray-800 mb-2">Carregando...</h2>
+              <p className="text-gray-600 text-sm mb-4">Conectando ao sistema...</p>
             </div>
           </div>
         );
@@ -390,7 +399,7 @@
             
             <div className="p-6 text-center border-t border-gray-100 mt-2">
                <div className="text-[10px] text-gray-500 mb-1 flex flex-col items-center justify-center gap-1 opacity-80"><div className="flex items-center gap-1"><Icon.Lock /><span className="font-semibold">Privacidade e Segurança</span></div><span className="leading-tight max-w-[280px]">Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).</span></div>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.8 (Phantom Player)</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 5.0 (Single User)</div>
             </div>
 
             {settingsOpen && (
