@@ -348,7 +348,7 @@
             window.open(url, '_blank');
          };
 
-         // --- ALARME NATIVO DO DISPOSITIVO (NOVO) ---
+         // --- ALARME NATIVO DO DISPOSITIVO (CORRIGIDO) ---
          const setNativeAlarm = () => {
             let h, m, title;
             // 1. Se já entrou, alarme para SAÍDA
@@ -369,8 +369,8 @@
                 return;
             }
 
-            // Tenta abrir o relógio nativo do Android
-            const intent = `intent:#Intent;action=android.intent.action.SET_ALARM;i.hour=${h};i.minutes=${m};S.message=${encodeURIComponent(title)};end`;
+            // Tenta abrir o relógio nativo do Android usando chaves de extra corretas
+            const intent = `intent:#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.alarm.HOUR=${h};i.android.intent.extra.alarm.MINUTES=${m};S.android.intent.extra.alarm.MESSAGE=${encodeURIComponent(title)};end`;
             window.location.href = intent;
          };
 
