@@ -370,7 +370,7 @@
             }
 
             // Tenta abrir o relógio nativo do Android usando chaves de extra corretas
-            const intent = `intent:#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.alarm.HOUR=${h};i.android.intent.extra.alarm.MINUTES=${m};S.android.intent.extra.alarm.MESSAGE=${encodeURIComponent(title)};end`;
+            const intent = `intent:#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.alarm.HOUR=${h};i.android.intent.extra.alarm.MINUTES=${m};S.android.intent.extra.alarm.MESSAGE=${encodeURIComponent(title)};B.android.intent.extra.alarm.SKIP_UI=false;end`;
             window.location.href = intent;
          };
 
