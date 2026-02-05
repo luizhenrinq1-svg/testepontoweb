@@ -306,27 +306,41 @@
              }
          };
 
-         // --- INTEGRAÇÃO COM AGENDA ---
+         // --- INTEGRAÇÃO COM AGENDA (INTELIGENTE) ---
          const addToCalendar = () => {
-            if (!entryTime || !targetHours) { 
-               alert("Você precisa registrar a entrada primeiro para calcular a saída."); 
-               return; 
+            const now = new Date();
+            const fmtNum = (n) => String(n).padStart(2, '0');
+            let title = "";
+            let details = "";
+            let dateObj = null;
+
+            // CASO 1: JÁ ENTROU -> Agendar SAÍDA
+            if (entryTime && targetHours) {
+                const [h, m] = entryTime.split(':').map(Number);
+                dateObj = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h + targetHours, m);
+                title = "Saída PontoWeb";
+                details = "Hora de registrar a saída do ponto!";
+            } 
+            // CASO 2: AINDA NÃO ENTROU -> Agendar ENTRADA
+            else if (notifConfig.entryTimeStr) {
+                const [h, m] = notifConfig.entryTimeStr.split(':').map(Number);
+                dateObj = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+                title = "Entrada PontoWeb";
+                details = "Hora de registrar a entrada no ponto!";
+            } else {
+                alert("Configure seu horário de entrada ou registre o ponto primeiro."); 
+                return;
             }
             
-            const now = new Date();
-            const [h, m] = entryTime.split(':').map(Number);
-            const exitDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h + targetHours, m);
-            
-            const fmtNum = (n) => String(n).padStart(2, '0');
-            const dateStr = exitDate.getFullYear() + fmtNum(exitDate.getMonth() + 1) + fmtNum(exitDate.getDate());
-            const timeStr = fmtNum(exitDate.getHours()) + fmtNum(exitDate.getMinutes()) + '00';
+            const dateStr = dateObj.getFullYear() + fmtNum(dateObj.getMonth() + 1) + fmtNum(dateObj.getDate());
+            const timeStr = fmtNum(dateObj.getHours()) + fmtNum(dateObj.getMinutes()) + '00';
             const startDateTime = `${dateStr}T${timeStr}`;
             
-            const endDate = new Date(exitDate.getTime() + 10 * 60000);
+            const endDate = new Date(dateObj.getTime() + 10 * 60000); // 10 min de duração
             const endTimeStr = fmtNum(endDate.getHours()) + fmtNum(endDate.getMinutes()) + '00';
             const endDateTime = `${dateStr}T${endTimeStr}`;
 
-            const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=Saída+PontoWeb&dates=${startDateTime}/${endDateTime}&details=Hora+de+registrar+a+saída+do+ponto!&sf=true&output=xml`;
+            const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startDateTime}/${endDateTime}&details=${encodeURIComponent(details)}&sf=true&output=xml`;
             window.open(url, '_blank');
          };
 
@@ -637,7 +651,8 @@
                         </p>
                         
                         <button onClick={addToCalendar} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all">
-                           <Icon.Calendar/> Agendar Saída na Agenda
+                           <Icon.Calendar/> 
+                           {entryTime ? "Agendar Saída na Agenda" : "Agendar Entrada na Agenda"}
                         </button>
                         
                         <form onSubmit={saveSettings} className="space-y-4 mb-6">
