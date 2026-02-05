@@ -181,6 +181,19 @@
           return () => { clearInterval(timer); clearInterval(notifTimer); releaseWakeLock(); };
         }, [notifConfig, entryTime, lastAction, targetHours, swRegistration]);
 
+        // TIMEOUT DE SEGURANÇA NO LOADING
+        useEffect(() => {
+           if (status === 'loading') {
+              const timeout = setTimeout(() => {
+                 // Se travar no loading por 7 segundos, força a tela de login
+                 console.warn("Loading timeout - forçando tela de link");
+                 localStorage.removeItem('ponto_auth_data'); // Opcional: limpar dados corrompidos
+                 setStatus('waiting_link');
+              }, 7000); 
+              return () => clearTimeout(timeout);
+           }
+        }, [status]);
+
         const requestWakeLock = async () => {
           if ('wakeLock' in navigator) { try { wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch (err) {} }
         };
@@ -460,11 +473,52 @@
         };
 
         // --- RENDER ---
+        
+        // TELA DE LOADING EXPLÍCITA (Com botão de escape)
+        if (status === 'loading') return (
+            <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50 fade-in">
+               <div className="spinner mb-4 border-t-green-500 border-green-200"></div>
+               <p className="text-gray-600 mb-6 font-medium">Conectando ao sistema...</p>
+               <button onClick={() => { localStorage.removeItem('ponto_auth_data'); setStatus('waiting_link'); }} className="text-xs text-red-500 underline hover:text-red-700 transition-colors">
+                 Demorando muito? Cancelar e Inserir Link Manualmente
+               </button>
+            </div>
+        );
+
         if (status === 'no-link') return (
           <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-red-100 max-w-sm">
               <h2 className="text-xl font-bold text-gray-800 mb-2">Acesso não identificado</h2>
               <p className="text-gray-600 text-sm mb-4">Vá no WhatsApp/Email e clique no link original do seu ponto.</p>
+            </div>
+          </div>
+        );
+
+        // TELA DE BOAS-VINDAS / CONFIGURAÇÃO INICIAL
+        if (status === 'waiting_link') return (
+          <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50 fade-in">
+            <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm border border-gray-100">
+              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <Icon.Link />
+              </div>
+              <h2 className="text-xl font-bold text-gray-800 mb-2">Bem-vindo ao PontoWeb</h2>
+              <p className="text-gray-500 text-sm mb-6">Para começar, cole o link de acesso que você recebeu no WhatsApp ou Email.</p>
+              
+              <form onSubmit={handleManualLogin}>
+                 <textarea 
+                   placeholder="Cole seu link aqui (https://...)" 
+                   className="w-full p-4 bg-gray-50 border rounded-xl text-sm mb-4 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all resize-none"
+                   rows="3"
+                   value={inputUrl}
+                   onChange={e => setInputUrl(e.target.value)}
+                 ></textarea>
+                 <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition-all">
+                   Salvar e Entrar
+                 </button>
+              </form>
+              <div className="mt-6 text-xs text-gray-400">
+                 Configuração única. Seus dados ficarão salvos.
+              </div>
             </div>
           </div>
         );
