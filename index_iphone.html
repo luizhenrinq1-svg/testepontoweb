@@ -287,7 +287,7 @@
         };
 
         const logout = () => {
-            if(confirm("Deseja desconectar esta conta e voltar para a tela de login?")) {
+            if(window.confirm("Deseja desconectar esta conta e voltar para a tela de login?")) {
                 localStorage.removeItem('ponto_auth_data');
                 setParams(null);
                 setBolsistaName('');
@@ -416,7 +416,7 @@
            if(config.enabled) { startKeepAlive(); playAlert(); }
         };
 
-        const resetState = () => { setResult(null); setPunchType(null); setStatus('loading'); if (params) saveAndLogin(params.id, params.token); initGPS(); };
+        const resetState = () => { setResult(null); setPunchType(null); setStatus('loading'); if (params) loadBolsista(params.id, params.token); initGPS(); };
 
         const startCamera = async (type) => {
           setPunchType(type); setStatus('punching');
@@ -426,13 +426,16 @@
           } catch(e) { alert('Erro: Câmera necessária.'); setStatus('ready'); }
         };
 
-        const confirm = () => {
+        const enviarRegistro = () => {
           const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 240;
           const ctx = canvas.getContext('2d');
           
           if (videoRef.current) {
+             // === NOVO: Espelha a captura para ficar igual ao preview ===
              ctx.translate(320, 0);
              ctx.scale(-1, 1);
+             // ==========================================================
+             
              ctx.drawImage(videoRef.current, 0, 0, 320, 240); 
              videoRef.current.srcObject.getTracks().forEach(t => t.stop()); 
           }
@@ -445,45 +448,36 @@
           });
         };
 
+        const loadBolsista = (id, token) => {
+             google.script.run.withSuccessHandler(res => {
+                if(res.nome) setBolsistaName(res.nome);
+                if(res.entryTime) setEntryTime(res.entryTime);
+                if(res.exitTime) setExitTime(res.exitTime); // Sincroniza saída
+                if(res.lastAction) setLastAction(res.lastAction);
+                if(res.horasDia) setTargetHours(Number(res.horasDia));
+                setStatus('ready');
+             }).getBolsistaInfo(id, token);
+        };
+
         // --- RENDER ---
-        
-        // TELA DE BOAS-VINDAS / CONFIGURAÇÃO INICIAL
-        if (status === 'waiting_link') return (
-          <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50 fade-in">
-            <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm border border-gray-100">
-              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                <Icon.Link />
-              </div>
-              <h2 className="text-xl font-bold text-gray-800 mb-2">Bem-vindo ao PontoWeb</h2>
-              <p className="text-gray-500 text-sm mb-6">Para começar, cole o link de acesso que você recebeu no WhatsApp ou Email.</p>
-              
-              <form onSubmit={handleManualLogin}>
-                 <textarea 
-                   placeholder="Cole seu link aqui (https://...)" 
-                   className="w-full p-4 bg-gray-50 border rounded-xl text-sm mb-4 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all resize-none"
-                   rows="3"
-                   value={inputUrl}
-                   onChange={e => setInputUrl(e.target.value)}
-                 ></textarea>
-                 <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition-all">
-                   Salvar e Entrar
-                 </button>
-              </form>
-              <div className="mt-6 text-xs text-gray-400">
-                 Configuração única. Seus dados ficarão salvos.
-              </div>
+        if (status === 'no-link') return (
+          <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
+            <div className="bg-white p-6 rounded-2xl shadow-lg border border-red-100 max-w-sm">
+              <h2 className="text-xl font-bold text-gray-800 mb-2">Acesso não identificado</h2>
+              <p className="text-gray-600 text-sm mb-4">Vá no WhatsApp/Email e clique no link original do seu ponto.</p>
             </div>
           </div>
         );
 
         if (status === 'success') return <div className="h-screen flex flex-col items-center justify-center bg-white p-6 text-center fade-in"><Icon.Check /><h2 className="text-2xl font-bold mt-4 text-green-700">Ponto Registrado!</h2><p className="text-4xl font-bold mt-2 text-gray-800">{result.timestamp.split(' ')[1]}</p><p className="text-gray-500 mt-1">{result.status}</p><button onClick={resetState} className="mt-10 px-8 py-3 bg-green-50 text-green-700 font-bold rounded-full hover:bg-green-100 shadow-sm">Voltar</button></div>;
         
-        if (status === 'punching') return <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50 fade-in"><video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover opacity-80 scale-x-[-1]"></video><div className="absolute bottom-10 w-full px-6 flex gap-4"><button onClick={() => { if(videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t=>t.stop()); setStatus('ready'); }} className="flex-1 bg-white text-black py-4 rounded-xl font-bold shadow-lg">Cancelar</button><button onClick={confirm} className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 active:scale-95 transition-transform"><Icon.Camera/> Confirmar</button></div><div className="absolute top-10 text-white font-bold text-xl drop-shadow-md bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">A registar {punchType}</div></div>;
+        // === ATUALIZADO: Adicionado 'scale-x-[-1]' na classe do vídeo para espelhar visualização ===
+        if (status === 'punching') return <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50 fade-in"><video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover opacity-80 scale-x-[-1]"></video><div className="absolute bottom-10 w-full px-6 flex gap-4"><button onClick={() => { if(videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t=>t.stop()); setStatus('ready'); }} className="flex-1 bg-white text-black py-4 rounded-xl font-bold shadow-lg">Cancelar</button><button onClick={enviarRegistro} className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 active:scale-95 transition-transform"><Icon.Camera/> Confirmar</button></div><div className="absolute top-10 text-white font-bold text-xl drop-shadow-md bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">A registar {punchType}</div></div>;
 
         // Lógica de Bloqueio
         const isEntryBlocked = lastAction === 'Entrada' || lastAction === 'Intervalo-Fim'; 
         const isExitBlocked = lastAction === 'Saida';
-        const isGpsBlocked = gpsState !== 'acquired'; 
+        const isGpsBlocked = gpsState !== 'acquired'; // NOVO: Bloqueio por GPS
 
         return (
           <div className="min-h-screen max-w-md mx-auto bg-white shadow-xl flex flex-col relative">
