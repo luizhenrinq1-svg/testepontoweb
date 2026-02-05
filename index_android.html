@@ -306,7 +306,7 @@
              }
          };
 
-         // --- INTEGRAÇÃO COM AGENDA (INTELIGENTE) ---
+         // --- INTEGRAÇÃO COM AGENDA (INTELIGENTE & RECORRENTE) ---
          const addToCalendar = () => {
             const now = new Date();
             const fmtNum = (n) => String(n).padStart(2, '0');
@@ -318,15 +318,15 @@
             if (entryTime && targetHours) {
                 const [h, m] = entryTime.split(':').map(Number);
                 dateObj = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h + targetHours, m);
-                title = "Saída PontoWeb";
-                details = "Hora de registrar a saída do ponto!";
+                title = "🔴 SAÍDA PONTO (Alarme)";
+                details = "Hora de registrar a saída! Este lembrete repete nos dias úteis.";
             } 
             // CASO 2: AINDA NÃO ENTROU -> Agendar ENTRADA
             else if (notifConfig.entryTimeStr) {
                 const [h, m] = notifConfig.entryTimeStr.split(':').map(Number);
                 dateObj = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
-                title = "Entrada PontoWeb";
-                details = "Hora de registrar a entrada no ponto!";
+                title = "🟢 ENTRADA PONTO (Alarme)";
+                details = "Hora de registrar a entrada! Este lembrete repete nos dias úteis.";
             } else {
                 alert("Configure seu horário de entrada ou registre o ponto primeiro."); 
                 return;
@@ -340,7 +340,10 @@
             const endTimeStr = fmtNum(endDate.getHours()) + fmtNum(endDate.getMinutes()) + '00';
             const endDateTime = `${dateStr}T${endTimeStr}`;
 
-            const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startDateTime}/${endDateTime}&details=${encodeURIComponent(details)}&sf=true&output=xml`;
+            // Adiciona recorrência para dias úteis (Seg-Sex)
+            const recurrence = "&recur=RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR";
+
+            const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startDateTime}/${endDateTime}&details=${encodeURIComponent(details)}&sf=true&output=xml${recurrence}`;
             window.open(url, '_blank');
          };
 
@@ -652,7 +655,7 @@
                         
                         <button onClick={addToCalendar} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all">
                            <Icon.Calendar/> 
-                           {entryTime ? "Agendar Saída na Agenda" : "Agendar Entrada na Agenda"}
+                           {entryTime ? "Agendar Saída (Recorrente)" : "Agendar Entrada (Recorrente)"}
                         </button>
                         
                         <form onSubmit={saveSettings} className="space-y-4 mb-6">
