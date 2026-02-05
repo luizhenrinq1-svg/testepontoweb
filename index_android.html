@@ -147,7 +147,8 @@
          const [currentTime, setCurrentTime] = useState(new Date());
          
          const [settingsOpen, setSettingsOpen] = useState(false);
-         const [notifConfig, setNotifConfig] = useState({ enabled: false, entryTimeStr: '08:00', reminderMins: 10 });
+         // Configuração agora suporta exitTimeStr para definir saída manual
+         const [notifConfig, setNotifConfig] = useState({ enabled: false, entryTimeStr: '08:00', exitTimeStr: '', reminderMins: 10 });
          const [activeAlert, setActiveAlert] = useState(null);
          const [swRegistration, setSwRegistration] = useState(null);
          const [monitorActive, setMonitorActive] = useState(false);
@@ -160,20 +161,17 @@
 
          // --- SETUP INICIAL ---
          useEffect(() => {
-            // Registra Service Worker se disponível
             if ('serviceWorker' in navigator) {
                navigator.serviceWorker.register('./sw.js')
                  .then(reg => setSwRegistration(reg))
                  .catch(e => console.error("SW Erro", e));
             }
             
-            // Carrega configurações salvas
             const saved = localStorage.getItem('pontoWebConfig');
             if (saved) {
                setNotifConfig(prev => ({...prev, ...JSON.parse(saved)}));
             }
             
-            // Retomar áudio se a aba voltar ao foco
             document.addEventListener('visibilitychange', () => {
                if (document.visibilityState === 'visible' && notifConfig.enabled) {
                   startKeepAlive();
@@ -185,7 +183,7 @@
          useEffect(() => {
             const timer = setInterval(() => { 
                setCurrentTime(new Date()); 
-               setMonitorActive(prev => !prev); // Pisca indicador
+               setMonitorActive(prev => !prev);
             }, 1000);
             
             const notifTimer = setInterval(checkNotifications, 15000); 
@@ -222,7 +220,6 @@
                phantomAudioRef.current.volume = 0.05; 
                phantomAudioRef.current.play()
                  .then(() => {
-                    // Configura sessão de mídia para controles na tela de bloqueio
                     if ('mediaSession' in navigator) {
                         navigator.mediaSession.metadata = new MediaMetadata({
                             title: 'Monitoramento PontoWeb',
@@ -259,34 +256,57 @@
              }
          };
 
+         // === LÓGICA CORRIGIDA DE NOTIFICAÇÃO (ENTRADA E SAÍDA) ===
          const checkNotifications = () => {
-             if (!notifConfig.enabled || !targetHours || !notifConfig.entryTimeStr) return;
+             if (!notifConfig.enabled) return;
              
              const now = new Date(); 
              const totalMin = now.getHours() * 60 + now.getMinutes();
-             const [h, m] = notifConfig.entryTimeStr.split(':').map(Number); 
-             const confMin = h * 60 + m;
              
-             // Alerta antes de começar
-             if (!lastAction && totalMin === (confMin - notifConfig.reminderMins)) {
-                triggerAppAlert("LEMBRETE PONTO", `Faltam ${notifConfig.reminderMins} min para entrar.`);
+             // 1. LEMBRETE DE ENTRADA (Se configurado e ainda não entrou)
+             if (notifConfig.entryTimeStr && !lastAction) {
+                 const [h, m] = notifConfig.entryTimeStr.split(':').map(Number); 
+                 const entryTargetMin = h * 60 + m;
+                 
+                 // Aviso Prévio
+                 if (totalMin === (entryTargetMin - notifConfig.reminderMins)) {
+                    triggerAppAlert("LEMBRETE ENTRADA", `Faltam ${notifConfig.reminderMins} min para entrar.`);
+                 }
+                 // Aviso Atraso
+                 if (totalMin === (entryTargetMin + 5)) {
+                    triggerAppAlert("REGISTRO PENDENTE", "Passaram 5 minutos do horário de entrada!");
+                 }
              }
              
-             // Alerta atraso
-             if (!lastAction && totalMin === (confMin + 5)) {
-                triggerAppAlert("REGISTRO PENDENTE", "Passaram 5 minutos do horário!");
-             }
+             // 2. LEMBRETE DE SAÍDA (Com Aviso Prévio)
+             let exitTargetMin = null;
              
-             // Alerta saída
-             if (entryTime && lastAction !== 'Saida') {
+             // Prioridade 1: Horário Fixo Manual
+             if (notifConfig.exitTimeStr) {
+                 const [h, m] = notifConfig.exitTimeStr.split(':').map(Number);
+                 exitTargetMin = h * 60 + m;
+             } 
+             // Prioridade 2: Cálculo Automático (Entrada Real + Horas Meta)
+             else if (entryTime && targetHours) {
                  const [eh, em] = entryTime.split(':').map(Number);
-                 if ((totalMin - (eh * 60 + em)) === targetHours * 60) {
-                    triggerAppAlert("META ATINGIDA", "Você completou suas horas de hoje!");
+                 exitTargetMin = (eh * 60 + em) + (targetHours * 60);
+             }
+
+             // Se temos uma meta de saída e o usuário ainda não saiu
+             if (exitTargetMin && lastAction !== 'Saida') {
+                 // Aviso Prévio (Igual ao da Entrada)
+                 if (totalMin === (exitTargetMin - notifConfig.reminderMins)) {
+                     triggerAppAlert("SAÍDA PRÓXIMA", `Faltam ${notifConfig.reminderMins} min para completar o dia.`);
+                 }
+                 
+                 // Aviso de Meta Atingida (Hora Exata)
+                 if (totalMin === exitTargetMin) {
+                     triggerAppAlert("META ATINGIDA", "Horário cumprido! Pode registrar a saída.");
                  }
              }
          };
 
-         // --- INTEGRAÇÃO COM AGENDA (SOLUÇÃO P/ MÚSICA) ---
+         // --- INTEGRAÇÃO COM AGENDA ---
          const addToCalendar = () => {
             if (!entryTime || !targetHours) { 
                alert("Você precisa registrar a entrada primeiro para calcular a saída."); 
@@ -295,16 +315,13 @@
             
             const now = new Date();
             const [h, m] = entryTime.split(':').map(Number);
-            // Calcula hora de saída estimada
             const exitDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h + targetHours, m);
             
-            // Formata data para URL do Google Agenda (YYYYMMDDTHHMMSS)
             const fmtNum = (n) => String(n).padStart(2, '0');
             const dateStr = exitDate.getFullYear() + fmtNum(exitDate.getMonth() + 1) + fmtNum(exitDate.getDate());
             const timeStr = fmtNum(exitDate.getHours()) + fmtNum(exitDate.getMinutes()) + '00';
             const startDateTime = `${dateStr}T${timeStr}`;
             
-            // Cria evento com duração de 10 min
             const endDate = new Date(exitDate.getTime() + 10 * 60000);
             const endTimeStr = fmtNum(endDate.getHours()) + fmtNum(endDate.getMinutes()) + '00';
             const endDateTime = `${dateStr}T${endTimeStr}`;
@@ -405,7 +422,6 @@
              const ctx = canvas.getContext('2d');
              
              if (videoRef.current) { 
-                // Espelhar horizontalmente para ficar intuitivo
                 ctx.translate(320, 0); 
                 ctx.scale(-1, 1); 
                 ctx.drawImage(videoRef.current, 0, 0, 320, 240); 
@@ -443,6 +459,23 @@
                alert("Erro: Câmera necessária."); 
                setStatus('ready'); 
             } 
+         };
+
+         const testNotification = () => { triggerAppAlert("Teste PontoWeb", "Teste de Notificação"); };
+
+         const saveSettings = (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const config = { 
+               enabled: notifConfig.enabled, 
+               entryTimeStr: formData.get('entryTime'), 
+               exitTimeStr: formData.get('exitTime'), // Captura o novo campo
+               reminderMins: Number(formData.get('reminderMins')) 
+            };
+            setNotifConfig(config);
+            localStorage.setItem('pontoWebConfig', JSON.stringify(config));
+            setSettingsOpen(false);
+            if(config.enabled) { startKeepAlive(); playAlert(); }
          };
 
          // --- RENDERS ---
@@ -607,9 +640,17 @@
                            <Icon.Calendar/> Agendar Saída na Agenda
                         </button>
                         
-                        <button onClick={()=>{setNotifConfig(p=>({...p, enabled:true})); startKeepAlive();}} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-6 flex items-center justify-center gap-2 shadow-sm hover:bg-blue-700 active:scale-95 transition-all">
-                           <Icon.Zap/> Ativar Monitoramento (Áudio)
-                        </button>
+                        <form onSubmit={saveSettings} className="space-y-4 mb-6">
+                           <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Seu Horário de Entrada (Fixo)</label><input type="time" name="entryTime" defaultValue={notifConfig.entryTimeStr} className="w-full p-3 bg-gray-50 border rounded-xl font-bold text-center text-lg outline-none focus:border-green-500"/></div>
+                           <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Seu Horário de Saída (Fixo/Opcional)</label><input type="time" name="exitTime" defaultValue={notifConfig.exitTimeStr} className="w-full p-3 bg-gray-50 border rounded-xl font-bold text-center text-lg outline-none focus:border-green-500"/></div>
+                           <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Avisar antecedência (minutos)</label><input type="number" name="reminderMins" defaultValue={notifConfig.reminderMins} min="1" max="60" className="w-full p-3 bg-gray-50 border rounded-xl font-bold text-center text-lg outline-none focus:border-green-500"/></div>
+                           
+                           <button type="button" onClick={testNotification} className="w-full py-2 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300 flex items-center justify-center gap-2 text-sm">🔔 Testar Notificação Agora</button>
+                           
+                           <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition-all">
+                              <Icon.Zap/> Salvar & Ativar Monitoramento
+                           </button>
+                        </form>
                         
                         <div className="border-t pt-4">
                            <button onClick={logout} className="w-full bg-red-50 text-red-600 py-3 rounded-xl font-bold border border-red-100 flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-red-100">
