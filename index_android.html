@@ -95,7 +95,8 @@
         Link: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>,
         Download: () => <svg className="w-6 h-6 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>,
         LogOut: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>,
-        Calendar: () => <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Calendar: () => <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>,
+        Clock: () => <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       };
 
       // --- TELA DE INSTRUÇÕES DE INSTALAÇÃO (ANDROID) ---
@@ -345,6 +346,32 @@
 
             const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startDateTime}/${endDateTime}&details=${encodeURIComponent(details)}&sf=true&output=xml${recurrence}`;
             window.open(url, '_blank');
+         };
+
+         // --- ALARME NATIVO DO DISPOSITIVO (NOVO) ---
+         const setNativeAlarm = () => {
+            let h, m, title;
+            // 1. Se já entrou, alarme para SAÍDA
+            if (entryTime && targetHours) {
+                const [eh, em] = entryTime.split(':').map(Number);
+                const date = new Date();
+                date.setHours(eh + targetHours, em);
+                h = date.getHours();
+                m = date.getMinutes();
+                title = "Saída PontoWeb";
+            } 
+            // 2. Se não entrou, alarme para ENTRADA
+            else if (notifConfig.entryTimeStr) {
+                [h, m] = notifConfig.entryTimeStr.split(':').map(Number);
+                title = "Entrada PontoWeb";
+            } else {
+                alert("Necessário registrar entrada ou configurar horário.");
+                return;
+            }
+
+            // Tenta abrir o relógio nativo do Android
+            const intent = `intent:#Intent;action=android.intent.action.SET_ALARM;i.hour=${h};i.minutes=${m};S.message=${encodeURIComponent(title)};end`;
+            window.location.href = intent;
          };
 
          // --- DATA LOADING & LOGIN ---
@@ -653,10 +680,17 @@
                            💡 Dica: Se for ouvir música, use a opção de agendar na Agenda para garantir que não perderá o horário.
                         </p>
                         
-                        <button onClick={addToCalendar} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all">
-                           <Icon.Calendar/> 
-                           {entryTime ? "Agendar Saída (Recorrente)" : "Agendar Entrada (Recorrente)"}
-                        </button>
+                        <div className="grid grid-cols-1 gap-3 mb-4">
+                           <button onClick={addToCalendar} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all">
+                              <Icon.Calendar/> 
+                              {entryTime ? "Agendar Saída na Agenda" : "Agendar Entrada na Agenda"}
+                           </button>
+                           
+                           <button onClick={setNativeAlarm} className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-orange-700 active:scale-95 transition-all">
+                              <Icon.Clock/> 
+                              Definir Alarme no Android
+                           </button>
+                        </div>
                         
                         <form onSubmit={saveSettings} className="space-y-4 mb-6">
                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Seu Horário de Entrada (Fixo)</label><input type="time" name="entryTime" defaultValue={notifConfig.entryTimeStr} className="w-full p-3 bg-gray-50 border rounded-xl font-bold text-center text-lg outline-none focus:border-green-500"/></div>
