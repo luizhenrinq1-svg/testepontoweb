@@ -3,27 +3,43 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PontoWeb</title>
+    <title>PontoWeb Android</title>
+    
     <link rel="manifest" href="./manifest.json">
-    <meta name="theme-color" content="#166534">
+    <!-- Cor da barra do Chrome no Android -->
+    <meta name="theme-color" content="#15803d">
+    <meta name="mobile-web-app-capable" content="yes">
+    
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body { background-color: #f0fdf4; color: #166534; font-family: Roboto, sans-serif; }
+      .spinner { border: 4px solid #dcfce7; width: 40px; height: 40px; border-radius: 50%; border-left-color: #16a34a; animation: spin 1s linear infinite; }
+      @keyframes spin { 100% { transform: rotate(360deg); } }
+      .fade-in { animation: fadeIn 0.3s ease-in; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      .ripple { position: relative; overflow: hidden; transform: translate3d(0, 0, 0); }
+      .ripple:after { content: ""; display: block; position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; background-image: radial-gradient(circle, #000 10%, transparent 10.01%); background-repeat: no-repeat; background-position: 50%; transform: scale(10, 10); opacity: 0; transition: transform .5s, opacity 1s; }
+      .ripple:active:after { transform: scale(0, 0); opacity: .2; transition: 0s; }
+    </style>
   </head>
-  <body class="bg-gray-50">
+  <body>
     <div id="root"></div>
     <script type="text/babel">
       const { useState, useEffect, useRef } = React;
-      // Reutilizando a mesma lógica de API e Componentes para consistência
+      
+      // === CONFIGURAÇÃO (MANTIDA DO ORIGINAL) ===
       const API_URL = "https://script.google.com/macros/s/AKfycbwYSqYPf-8ckGroc3TlZHD2n5LhTSDD04auBHEgXxzo_OkJCfbO-Jv3PlKcNtPbV-36MA/exec";
+      const PRE_CONFIG_ID = "622bc424";
+      const PRE_CONFIG_TOKEN = "f873b36b-042f-4313-b74f-a990ed8edb6f";
+      // ==========================================
 
       const ExternalBridge = {
         request: async (action, payload = {}) => {
           const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, ...payload }) });
-          const json = await response.json();
-          if (json.error) throw new Error(json.error);
-          return json;
+          return await response.json();
         }
       };
 
@@ -37,74 +53,61 @@
         window.google = { script: { run: createRunner() } };
       }
 
-      function InstallGuide({ prompt }) {
-        return (
-          <div className="h-screen flex flex-col items-center justify-center p-8 text-center bg-white">
-            <div className="max-w-sm w-full">
-              <img src="https://cdn-icons-png.flaticon.com/512/2983/2983818.png" className="w-24 h-24 mx-auto mb-6" />
-              <h1 className="text-2xl font-bold text-gray-800 mb-2">Instalar Aplicativo</h1>
-              <p className="text-gray-500 mb-8">Para garantir o funcionamento do GPS e notificações, instale o PontoWeb.</p>
-              
-              {prompt ? (
-                <button onClick={() => prompt.prompt()} className="w-full bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg text-lg animate-pulse">
-                  Instalar Agora
-                </button>
-              ) : (
-                <div className="bg-orange-50 text-orange-800 p-4 rounded-lg text-sm">
-                  Toque no menu do navegador (⋮) e selecione <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      }
+      const Icon = {
+        Map: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
+        Camera: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
+        Check: () => <svg className="w-16 h-16 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+        Download: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+      };
 
       function TimeClock() {
-        // ... (Lógica idêntica ao iPhone para manter consistência) ...
         const [params, setParams] = useState(null);
-        const [status, setStatus] = useState('loading');
         const [bolsistaName, setBolsistaName] = useState('');
-        const [result, setResult] = useState(null);
-        const [punchType, setPunchType] = useState(null);
+        const [entryTime, setEntryTime] = useState(null);
+        const [exitTime, setExitTime] = useState(null);
+        const [lastAction, setLastAction] = useState(null);
         const [location, setLocation] = useState(null);
-        const [inputUrl, setInputUrl] = useState('');
+        const [status, setStatus] = useState('loading');
+        const [gpsState, setGpsState] = useState('searching');
+        const [punchType, setPunchType] = useState(null);
+        const [result, setResult] = useState(null);
+        const [currentTime, setCurrentTime] = useState(new Date()); 
+        const [installPrompt, setInstallPrompt] = useState(null);
         const videoRef = useRef(null);
 
         useEffect(() => {
+          // Lógica de instalação nativa do Android
+          window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
+
           const u = new URLSearchParams(window.location.search);
-          const urlId = u.get('id'); const urlToken = u.get('token');
-          if (urlId && urlToken) saveAndLogin(urlId, urlToken);
-          else {
-             const saved = localStorage.getItem('ponto_auth_data');
-             if (saved) {
-                try {
-                  const { id, token } = JSON.parse(saved);
-                  if (id && token) saveAndLogin(id, token);
-                  else setStatus('waiting_link');
-                } catch(e) { setStatus('waiting_link'); }
-             } else setStatus('waiting_link');
-          }
+          const id = u.get('id') || PRE_CONFIG_ID;
+          const token = u.get('token') || PRE_CONFIG_TOKEN;
+          if(id && token) {
+            setParams({id, token});
+            loadBolsista(id, token);
+            initGPS();
+          } else setStatus('no-link');
+          const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+          return () => clearInterval(timer);
         }, []);
 
-        const saveAndLogin = (id, token) => {
-             localStorage.setItem('ponto_auth_data', JSON.stringify({ id, token }));
-             setParams({ id, token });
-             google.script.run.withSuccessHandler(res => {
-                if(res.nome) { setBolsistaName(res.nome); setStatus('ready'); navigator.geolocation.getCurrentPosition(p=>setLocation(p.coords)); }
-                else setStatus('waiting_link');
-             }).getBolsistaInfo(id, token);
+        const initGPS = () => {
+             setGpsState('searching');
+             navigator.geolocation.getCurrentPosition(
+               p => { setLocation(p.coords); setGpsState('acquired'); }, 
+               () => setGpsState('denied'), 
+               {enableHighAccuracy:true}
+             );
         };
 
-        const handleManualLogin = (e) => {
-             e.preventDefault();
-             try {
-                if (inputUrl.includes('?')) {
-                   const u = new URL(inputUrl);
-                   const p = new URLSearchParams(u.search);
-                   const id = p.get('id'); const token = p.get('token');
-                   if (id && token) saveAndLogin(id, token); else alert("Link incompleto.");
-                } else alert("Link inválido.");
-             } catch(err) { alert("Erro ao processar link."); }
+        const loadBolsista = (id, token) => {
+             google.script.run.withSuccessHandler(res => {
+                if(res.nome) setBolsistaName(res.nome);
+                if(res.entryTime) setEntryTime(res.entryTime);
+                if(res.exitTime) setExitTime(res.exitTime);
+                if(res.lastAction) setLastAction(res.lastAction);
+                setStatus('ready');
+             }).getBolsistaInfo(id, token);
         };
 
         const startCamera = async (type) => {
@@ -120,66 +123,61 @@
           const ctx = canvas.getContext('2d');
           if (videoRef.current) {
              ctx.translate(320, 0); ctx.scale(-1, 1);
-             ctx.drawImage(videoRef.current, 0, 0, 320, 240);
+             ctx.drawImage(videoRef.current, 0, 0, 320, 240); 
              videoRef.current.srcObject.getTracks().forEach(t => t.stop()); 
           }
           setStatus('sending');
           google.script.run.withSuccessHandler((res) => {
-             if(res.ok) { setResult(res); setStatus('success'); } else { alert(res.msg); setStatus('ready'); }
+             if(res.ok) { setResult(res); setStatus('success'); } else { alert("Erro: " + res.msg); setStatus('ready'); }
           }).registrarPonto({
              pessoaId: params.id, token: params.token, tipo: punchType,
              lat: location?.latitude, lng: location?.longitude, prec: location?.accuracy, fotoBase64: canvas.toDataURL('image/jpeg', 0.7)
           });
         };
 
-        if (status === 'waiting_link') return (
-          <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
-            <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Bem-vindo</h2>
-              <form onSubmit={handleManualLogin}>
-                 <textarea placeholder="Cole seu link aqui..." className="w-full p-4 bg-gray-50 border rounded-xl mb-4 text-sm" rows="3" value={inputUrl} onChange={e => setInputUrl(e.target.value)}></textarea>
-                 <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Entrar</button>
-              </form>
-            </div>
-          </div>
-        );
+        const installApp = () => {
+           if(installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(res => setInstallPrompt(null)); }
+        }
 
-        if (status === 'success') return <div className="h-screen flex flex-col items-center justify-center bg-white p-6 text-center"><h2 className="text-2xl font-bold text-green-700">Registrado!</h2><p className="mt-2">{result.timestamp}</p><button onClick={() => {setStatus('loading'); saveAndLogin(params.id, params.token);}} className="mt-8 px-6 py-2 bg-gray-100 rounded-lg">Voltar</button></div>;
+        if (status === 'success') return <div className="h-screen flex flex-col items-center justify-center bg-white p-6 text-center fade-in"><Icon.Check /><h2 className="text-2xl font-bold mt-4 text-green-700">Ponto Registrado!</h2><p className="text-4xl font-bold mt-2 text-gray-800">{result.timestamp.split(' ')[1]}</p><p className="text-gray-500 mt-1">{result.status}</p><button onClick={() => {setStatus('loading'); loadBolsista(params.id, params.token);}} className="mt-10 px-8 py-3 bg-green-50 text-green-700 font-bold rounded-full ripple">Voltar</button></div>;
+        
+        if (status === 'punching') return <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50 fade-in"><video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover opacity-80 scale-x-[-1]"></video><div className="absolute bottom-10 w-full px-6 flex gap-4"><button onClick={() => { if(videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t=>t.stop()); setStatus('ready'); }} className="flex-1 bg-white text-black py-4 rounded-xl font-bold shadow-lg ripple">Cancelar</button><button onClick={confirm} className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 ripple">Confirmar</button></div></div>;
 
-        if (status === 'punching') return <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50"><video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover opacity-80 scale-x-[-1]"></video><div className="absolute bottom-10 w-full px-6 flex gap-4"><button onClick={() => { if(videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t=>t.stop()); setStatus('ready'); }} className="flex-1 bg-white text-black py-4 rounded-xl font-bold">Cancelar</button><button onClick={confirm} className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold">Confirmar</button></div></div>;
-
-        if (status === 'loading') return <div className="h-screen flex items-center justify-center"><div className="w-10 h-10 border-4 border-green-500 rounded-full animate-spin border-t-transparent"></div></div>;
+        const isEntryBlocked = lastAction === 'Entrada' || lastAction === 'Intervalo-Fim'; 
+        const isExitBlocked = lastAction === 'Saida';
+        const isGpsBlocked = gpsState !== 'acquired';
 
         return (
-          <div className="min-h-screen bg-gray-50 p-6 flex flex-col justify-center gap-4">
-             <div className="text-center mb-4"><h1 className="text-2xl font-bold text-gray-800">Olá, {bolsistaName}</h1></div>
-             <button onClick={() => startCamera('Entrada')} className="bg-green-100 text-green-800 border border-green-300 p-5 rounded-2xl font-bold text-xl">ENTRADA</button>
-             <button onClick={() => startCamera('Saida')} className="bg-red-100 text-red-800 border border-red-300 p-5 rounded-2xl font-bold text-xl">SAÍDA</button>
-             <div className="grid grid-cols-2 gap-4">
-               <button onClick={() => startCamera('Intervalo-Inicio')} className="bg-white text-gray-700 p-4 rounded-xl font-bold border">Início Int.</button>
-               <button onClick={() => startCamera('Intervalo-Fim')} className="bg-white text-gray-700 p-4 rounded-xl font-bold border">Fim Int.</button>
-             </div>
+          <div className="min-h-screen max-w-md mx-auto bg-white shadow-xl flex flex-col relative">
+            <div className={`p-6 text-white text-center rounded-b-3xl shadow-lg z-10 transition-all ${gpsState === 'denied' ? 'bg-red-700' : 'bg-green-700'}`}>
+               {installPrompt && (
+                <button onClick={installApp} className="absolute top-4 left-4 bg-white/20 p-2 rounded-full hover:bg-white/40 transition-all z-20 animate-bounce" title="Instalar App"><Icon.Download /></button>
+               )}
+               <h1 className="text-2xl font-bold mt-2">PontoWeb Android</h1>
+               <div className="flex flex-col items-center mt-1"><span className="text-4xl font-mono font-bold tracking-widest">{currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></div>
+               <div className="inline-flex items-center gap-2 bg-black/20 px-3 py-1 rounded-full text-xs mt-2"><Icon.Map /> {gpsState === 'searching' ? 'Procurando...' : gpsState === 'denied' ? 'GPS Bloqueado' : 'Localização Ativa'}</div>
+            </div>
+
+            <div className="flex-1 p-6 flex flex-col justify-center gap-4">
+              <div className="text-center mb-4">
+                 <h3 className="text-xl font-bold text-gray-800">{bolsistaName || 'Carregando...'}</h3>
+                 <div className="flex gap-2 justify-center mt-2">{entryTime && <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold border border-blue-200">Entrada: {entryTime}</span>}{exitTime && <span className="bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-xs font-bold border border-orange-200">Saída: {exitTime}</span>}</div>
+              </div>
+
+              <button disabled={status!=='ready' || isGpsBlocked || isEntryBlocked} onClick={() => startCamera('Entrada')} className="bg-green-50 text-green-700 border-2 border-green-200 p-5 rounded-2xl font-bold text-xl ripple active:scale-95 disabled:opacity-50 shadow-sm">{isEntryBlocked ? 'ENTRADA REALIZADA' : 'REGISTRAR ENTRADA'}</button>
+              <button disabled={status!=='ready' || isGpsBlocked || isExitBlocked} onClick={() => startCamera('Saida')} className="bg-red-50 text-red-700 border-2 border-red-200 p-5 rounded-2xl font-bold text-xl ripple active:scale-95 disabled:opacity-50 shadow-sm">{isExitBlocked ? 'SAÍDA REALIZADA' : 'REGISTRAR SAÍDA'}</button>
+              
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <button disabled={status!=='ready' || isGpsBlocked} onClick={() => startCamera('Intervalo-Inicio')} className="bg-gray-50 text-gray-700 p-4 rounded-xl font-bold border-2 border-gray-100 ripple active:scale-95 disabled:opacity-50">Início Intervalo</button>
+                <button disabled={status!=='ready' || isGpsBlocked} onClick={() => startCamera('Intervalo-Fim')} className="bg-gray-50 text-gray-700 p-4 rounded-xl font-bold border-2 border-gray-100 ripple active:scale-95 disabled:opacity-50">Fim Intervalo</button>
+              </div>
+            </div>
+            <div className="p-4 text-center text-xs text-gray-300">Versão Android 5.0</div>
           </div>
         );
       }
-
-      function App() {
-        const [isStandalone, setIsStandalone] = useState(false);
-        const [installPrompt, setInstallPrompt] = useState(null);
-
-        useEffect(() => {
-          window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
-          const check = () => {
-             const isSA = window.matchMedia('(display-mode: standalone)').matches || document.referrer.includes('android-app://');
-             setIsStandalone(isSA);
-          };
-          check();
-        }, []);
-
-        return isStandalone ? <TimeClock /> : <InstallGuide prompt={installPrompt} />;
-      }
       const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(<App />);
+      root.render(<TimeClock />);
     </script>
   </body>
 </html>
