@@ -28,13 +28,13 @@ messaging.onBackgroundMessage((payload) => {
 
   const notificationOptions = {
     body: body,
-    icon: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png',
-    badge: 'https://cdn-icons-png.flaticon.com/512/2983/2983818.png',
+    icon: 'https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Icone.png?raw=true',
+    badge: 'https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Icone.png?raw=true',
     vibrate: [500, 200, 500, 200, 500],
     requireInteraction: true,
     tag: 'ponto-notification',
     data: {
-      url: 'https://luizhenrinq1-svg.github.io/pontowebtestets/' // Link absoluto do App
+      url: 'https://luizhenrinq1-svg.github.io/testepontoweb/' // Link absoluto do App
     }
   };
 
