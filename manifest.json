@@ -8,12 +8,12 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true",
+      "src": "https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Icone.png?raw=true",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true",
+      "src": "https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Icone.png?raw=true",
       "sizes": "512x512",
       "type": "image/png"
     }
