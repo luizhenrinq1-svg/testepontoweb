@@ -128,11 +128,12 @@
 
       // --- APP COMPONENT ---
       function TimeClock({ onBack }) {
-        // Inicialização "Lazy" para ler cache instantaneamente antes de renderizar
+        // Inicialização "Lazy" para ler cache instantaneamente antes de renderizar (GARANTIA DE MEMÓRIA)
         const [authData] = useState(() => JSON.parse(localStorage.getItem(CACHE_KEY_AUTH) || 'null'));
         const [cachedData] = useState(() => JSON.parse(localStorage.getItem(CACHE_KEY_DATA) || 'null'));
 
         const [params, setParams] = useState(authData);
+        // Garante que o nome venha do cache imediatamente
         const [bolsistaName, setBolsistaName] = useState(cachedData?.nome || '');
         const [lastAction, setLastAction] = useState(cachedData?.lastAction || null);
         const [entryTime, setEntryTime] = useState(cachedData?.entryTime || null);
@@ -155,7 +156,7 @@
 
         useEffect(() => { const t=setInterval(()=>setCurrentTime(new Date()),1000); return ()=>clearInterval(t); }, []);
         
-        // Recarrega config ao ganhar foco (para sincronizar com a página externa)
+        // Recarrega config ao ganhar foco
         const loadConfig = () => { const s=localStorage.getItem(CACHE_KEY_NOTIF); if(s) setLocalNotifConfig(JSON.parse(s)); };
         useEffect(() => { loadConfig(); window.addEventListener('focus', loadConfig); return ()=>window.removeEventListener('focus',loadConfig); }, []);
 
@@ -198,7 +199,6 @@
 
         // Lógica de Login/Carregamento
         useEffect(() => {
-          // Se já carregou via Lazy State, só valida se precisa buscar online
           const u=new URLSearchParams(window.location.search);
           const uid=u.get('id'), ut=u.get('token');
           
@@ -206,11 +206,10 @@
              // Login via URL (sobrescreve cache)
              saveAndLogin(uid, ut); 
           } else if (params) {
-             // Já tem dados do cache, atualiza em background
+             // Já tem dados do cache, atualiza em background, mas mantém a interface "ready"
              loadBolsistaBackground(params.id, params.token);
              initGPS();
           } else {
-             // Sem URL e Sem Cache
              setStatus('waiting_link');
           }
         }, []);
@@ -242,6 +241,7 @@
                if(res.error) { 
                  if(!cachedData) { alert(res.error); localStorage.removeItem(CACHE_KEY_AUTH); setStatus('waiting_link'); }
                } else {
+                 // SALVAR NA MEMÓRIA DO CELULAR (Cache)
                  localStorage.setItem(CACHE_KEY_DATA,JSON.stringify(res));
                  applyUserData(res);
                  setStatus('ready');
@@ -252,7 +252,7 @@
            } else if(!cachedData) {
              setStatus('error-offline');
            } else {
-             // Tem cache mas tá offline, já tá mostrando dados (ready)
+             // Tem cache mas tá offline, mantém mostrando dados (ready)
            }
         };
 
@@ -275,10 +275,14 @@
           google.script.run.withSuccessHandler(res => { 
              if(res.ok) { 
                setResult(res); setStatus('success'); 
-               const c=JSON.parse(localStorage.getItem(CACHE_KEY_DATA)||'{}'); c.lastAction=punchType;
+               // ATUALIZA MEMÓRIA IMEDIATAMENTE APÓS SUCESSO
+               const c=JSON.parse(localStorage.getItem(CACHE_KEY_DATA)||'{}'); 
+               c.lastAction=punchType;
                if(punchType==='Entrada') c.entryTime=res.timestamp.split(' ')[1].substring(0,5);
                if(punchType==='Saida') c.exitTime=res.timestamp.split(' ')[1].substring(0,5);
-               localStorage.setItem(CACHE_KEY_DATA,JSON.stringify(c)); applyUserData(c);
+               c.nome = bolsistaName; // Garante persistência do nome
+               localStorage.setItem(CACHE_KEY_DATA,JSON.stringify(c)); 
+               applyUserData(c);
              } else { alert("Erro: "+res.msg); setStatus('ready'); } 
           }).withFailureHandler(err => { alert("Erro servidor."); setStatus('ready'); }).registrarPonto(pl);
         };
@@ -320,6 +324,7 @@
                 </button>
               )}
 
+              {/* TÍTULO ESTÁTICO (Salvo no App Shell) */}
               <h1 className="text-2xl font-bold tracking-tight">PontoWeb</h1>
               <div className="mt-1 opacity-90 text-xs font-medium uppercase tracking-widest">Unespar</div>
               
@@ -338,14 +343,17 @@
             
             <div className="flex-1 p-6 flex flex-col justify-center gap-4 fade-in">
               <div className="text-center mb-4">
+                {/* INFORMAÇÃO SALVA NA MEMÓRIA DO CELULAR (Cache) */}
                 <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Bolsista Identificado</p>
-                <h3 className="text-lg font-bold text-gray-800">{bolsistaName || 'Carregando...'}</h3>
+                <h3 className="text-lg font-bold text-gray-800">{bolsistaName || <span className="animate-pulse">...</span>}</h3>
+                
                 <div className="flex gap-2 justify-center mt-3">
                   {entryTime && <div className="bg-blue-50 px-4 py-1.5 rounded-lg text-blue-700 text-xs font-bold border border-blue-100 flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500"></div> Entrada: {entryTime}</div>}
                   {exitTime && <div className="bg-orange-50 px-4 py-1.5 rounded-lg text-orange-700 text-xs font-bold border border-orange-100 flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-orange-500"></div> Saída: {exitTime}</div>}
                 </div>
               </div>
 
+              {/* BOTÕES ESTÁTICOS (Salvos no App Shell) */}
               <div className="grid grid-cols-2 gap-4">
                  <button disabled={isEntryBlocked || isLocationMissing} onClick={()=>startCamera('Entrada')} className="col-span-1 bg-green-50 border-2 border-green-100 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-green-100 transition-colors disabled:opacity-40 disabled:grayscale scale-click">
                     <div className="w-10 h-10 bg-green-200 rounded-full flex items-center justify-center text-green-700"><Icon.LogIn className="w-5 h-5"/></div>
@@ -363,6 +371,7 @@
               </div>
             </div>
 
+            {/* RODAPÉ ESTÁTICO (Salvo no App Shell) */}
             <div className="pb-6 text-center">
                <div className="text-[10px] text-gray-400 flex flex-col items-center justify-center gap-1 opacity-80 mb-2">
                  <div className="flex items-center gap-1">
@@ -373,7 +382,7 @@
                <span className="text-[10px] text-gray-400 leading-tight max-w-[280px] inline-block">
                  Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).
                </span>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 4.9</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 5.0 (Offline Ready)</div>
             </div>
           </div>
         );
@@ -434,7 +443,10 @@
         useEffect(() => {
           const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
           const hasParams = new URLSearchParams(window.location.search).has('id');
-          if (isStandalone || hasParams) setMode('app');
+          // VERIFICA SE JÁ TEM DADOS NA MEMÓRIA PARA PULAR LANDING PAGE
+          const hasCache = !!localStorage.getItem(CACHE_KEY_AUTH);
+
+          if (isStandalone || hasParams || hasCache) setMode('app');
         }, []);
         return mode === 'app' ? <TimeClock /> : <LandingPage onOpenWeb={() => setMode('app')} />;
       }
