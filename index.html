@@ -11,7 +11,8 @@
     <meta name="theme-color" content="#166534">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2983/2983818.png">
+    <!-- ATUALIZADO: Logo novo -->
+    <link rel="apple-touch-icon" href="https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true">
 
     <!-- Dependências -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -176,7 +177,8 @@
 
         const triggerAppAlert = (title) => {
            try { if('vibrate' in navigator) navigator.vibrate([200,100,200]); } catch(e){}
-           if (Notification.permission==='granted') new Notification(title,{icon:'https://cdn-icons-png.flaticon.com/512/2983/2983818.png'});
+           // ATUALIZADO: Logo novo
+           if (Notification.permission==='granted') new Notification(title,{icon:'https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true'});
         };
 
         useEffect(() => {
@@ -382,7 +384,7 @@
                <span className="text-[10px] text-gray-400 leading-tight max-w-[280px] inline-block">
                  Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).
                </span>
-               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 5.0</div>
+               <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 5.0 (Offline Ready)</div>
             </div>
           </div>
         );
@@ -409,7 +411,8 @@
           <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center fade-in relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-64 bg-green-600 rounded-b-[3rem] -z-10"></div>
             
-            <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center shadow-xl mb-6 bounce z-10"><img src="https://cdn-icons-png.flaticon.com/512/2983/2983818.png" className="w-14 h-14"/></div>
+            {/* ATUALIZADO: Logo novo */}
+            <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center shadow-xl mb-6 bounce z-10"><img src="https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true" className="w-14 h-14"/></div>
             
             <h1 className="text-3xl font-bold text-gray-800 mb-2">PontoWeb</h1>
             <p className="text-gray-500 mb-8 max-w-xs text-sm">Registre sua frequência com segurança e agilidade.</p>
