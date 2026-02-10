@@ -11,9 +11,8 @@
     <meta name="theme-color" content="#166534">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    
-    <!-- O ícone será injetado via JavaScript (veja abaixo) para permitir Base64 fácil -->
-    <link id="app-icon" rel="apple-touch-icon" href="">
+    <!-- ATUALIZADO: Icone do App -->
+    <link rel="apple-touch-icon" href="https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Icone.png?raw=true">
 
     <!-- Dependências -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -56,20 +55,6 @@
   <body>
 
     <div id="root"></div>
-
-    <!-- CONFIGURAÇÃO CENTRAL DE LOGO -->
-    <script>
-      // ==================================================================================
-      // 🟢 PARA USAR IMAGEM OFFLINE (SEM LINK):
-      // 1. Converta sua imagem para Base64 (use um site como 'base64-image.de')
-      // 2. Apague o link abaixo e cole o código gigante entre as aspas.
-      // Exemplo: const APP_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...";
-      // ==================================================================================
-      const APP_LOGO = "https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true";
-
-      // Aplica o logo ao cabeçalho (Apple Icon) automaticamente
-      document.getElementById('app-icon').href = APP_LOGO;
-    </script>
 
     <!-- SHIM -->
     <script>
@@ -192,8 +177,8 @@
 
         const triggerAppAlert = (title) => {
            try { if('vibrate' in navigator) navigator.vibrate([200,100,200]); } catch(e){}
-           // ATUALIZADO: Logo via variável
-           if (Notification.permission==='granted') new Notification(title,{icon: APP_LOGO});
+           // ATUALIZADO: Icone na notificação
+           if (Notification.permission==='granted') new Notification(title,{icon:'https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Icone.png?raw=true'});
         };
 
         useEffect(() => {
@@ -426,8 +411,8 @@
           <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center fade-in relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-64 bg-green-600 rounded-b-[3rem] -z-10"></div>
             
-            {/* ATUALIZADO: Logo via variável */}
-            <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center shadow-xl mb-6 bounce z-10"><img src={APP_LOGO} className="w-14 h-14"/></div>
+            {/* ATUALIZADO: Logo novo */}
+            <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center shadow-xl mb-6 bounce z-10"><img src="https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true" className="w-14 h-14"/></div>
             
             <h1 className="text-3xl font-bold text-gray-800 mb-2">PontoWeb</h1>
             <p className="text-gray-500 mb-8 max-w-xs text-sm">Registre sua frequência com segurança e agilidade.</p>
