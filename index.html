@@ -439,15 +439,18 @@
       }
 
       function Main() {
-        const [mode, setMode] = useState('landing');
-        useEffect(() => {
+        // CORREÇÃO: Verifica o modo ANTES da primeira renderização para evitar piscar a tela de instalação
+        const [mode, setMode] = useState(() => {
           const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
           const hasParams = new URLSearchParams(window.location.search).has('id');
-          // VERIFICA SE JÁ TEM DADOS NA MEMÓRIA PARA PULAR LANDING PAGE
-          const hasCache = !!localStorage.getItem(CACHE_KEY_AUTH);
+          const hasCache = !!localStorage.getItem(CACHE_KEY_AUTH); // Verifica se já fez login antes
+          
+          // Se for PWA, ou tiver Link, ou tiver Cache -> Vai direto pro App
+          if (isStandalone || hasParams || hasCache) return 'app';
+          
+          return 'landing';
+        });
 
-          if (isStandalone || hasParams || hasCache) setMode('app');
-        }, []);
         return mode === 'app' ? <TimeClock /> : <LandingPage onOpenWeb={() => setMode('app')} />;
       }
 
