@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instalar PontoWeb</title>
+    
+    <!-- PWA Setup (Importante: Usa o mesmo manifesto do app principal) -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#166534">
+    <link rel="apple-touch-icon" href="https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Icone.png?raw=true">
+    
+    <!-- Estilos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #f0fdf4; font-family: sans-serif; }
+        .bounce { animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(-5%); } 50% { transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center fade-in relative overflow-hidden">
+        <!-- Decoration -->
+        <div class="absolute top-0 left-0 w-full h-2 bg-green-500"></div>
+
+        <!-- Logo -->
+        <div class="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+            <img src="https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true" class="w-14 h-14 bounce">
+        </div>
+
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">Instalar PontoWeb</h1>
+        <p class="text-gray-500 mb-8 text-sm">Tenha acesso rápido ao sistema de ponto diretamente da tela inicial do seu celular.</p>
+
+        <!-- Botão de Instalação (Android/Desktop) -->
+        <button id="installBtn" class="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-green-700 transition-all active:scale-95 hidden flex items-center justify-center gap-2">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Instalar Aplicativo
+        </button>
+
+        <!-- Instruções iOS (iPhone) -->
+        <div id="iosInstruction" class="hidden mt-4 bg-gray-50 p-4 rounded-xl text-left border border-gray-100">
+            <h3 class="font-bold text-gray-800 mb-2 flex items-center gap-2">
+                <svg class="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.8-1.31.05-2.3-1.23-3.14-2.47-1.72-2.49-3.03-7.05-1.27-10.11 1.6-2.78 4.5-2.73 5.95-2.71 1.48.03 2.85.99 3.75.99.89 0 2.57-1.23 4.33-1.04 1.44.13 2.76.74 3.65 1.83-3.14 1.89-2.61 7.15.54 8.52zM13 1.75c.78-.96 1.3-2.3 1.15-3.63-1.12.05-2.49.77-3.29 1.73-.73.86-1.36 2.22-1.18 3.56 1.25.1 2.53-.7 3.32-1.66z"></path></svg>
+                Para iPhone/iPad:
+            </h3>
+            <ol class="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+                <li>Toque no botão <strong>Compartilhar</strong> <svg class="w-4 h-4 inline text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg></li>
+                <li>Role para baixo e selecione <strong>Adicionar ao Ecrã Principal</strong>.</li>
+                <li>Toque em <strong>Adicionar</strong> no canto superior.</li>
+            </ol>
+        </div>
+
+        <!-- Botão Acessar Web (Caso já tenha instalado ou queira usar no browser) -->
+        <a href="index.html" class="block mt-6 text-green-600 font-bold text-sm hover:underline">
+            Já instalou? Abrir PontoWeb
+        </a>
+        
+        <p class="text-xs text-gray-400 mt-8">Versão 1.0 • Unespar</p>
+    </div>
+
+    <script>
+        // 1. Registrar Service Worker (Obrigatório para PWA ser instalável)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+                .then(() => console.log('SW registrado para instalação'))
+                .catch(err => console.error('Erro SW', err));
+        }
+
+        // 2. Lógica de Instalação (Android/Chrome/PC)
+        let deferredPrompt;
+        const installBtn = document.getElementById('installBtn');
+        const iosInstruction = document.getElementById('iosInstruction');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Previne o banner automático padrão do Chrome (para usarmos nosso botão)
+            e.preventDefault();
+            deferredPrompt = e;
+            // Mostra o botão personalizado
+            installBtn.classList.remove('hidden');
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    deferredPrompt = null;
+                    installBtn.classList.add('hidden');
+                }
+            }
+        });
+
+        // 3. Detecção iOS (iPhone não dispara beforeinstallprompt, precisa de instruções manuais)
+        const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+        if (isIos && !isStandalone) {
+            iosInstruction.classList.remove('hidden');
+        }
+
+        // 4. Se já estiver instalado/standalone, muda o texto
+        if (isStandalone) {
+            document.querySelector('h1').textContent = "PontoWeb Instalado";
+            document.querySelector('p').textContent = "O aplicativo já está instalado neste dispositivo.";
+            installBtn.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
