@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Instalar PontoWeb</title>
     
-    <!-- PWA Setup (Importante: Usa o mesmo manifesto do app principal) -->
-    <link rel="manifest" href="manifest.json">
+    <!-- PWA Setup (Padrão Mobile - será trocado via JS se for PC) -->
+    <link id="manifest-link" rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#166534">
     <link rel="apple-touch-icon" href="https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Icone.png?raw=true">
     
@@ -19,6 +19,21 @@
         .fade-in { animation: fadeIn 0.5s ease-in; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
+
+    <!-- DETECÇÃO DE DISPOSITIVO E CONFIGURAÇÃO -->
+    <script>
+        (function() {
+            // Verifica se é dispositivo móvel
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            // Se NÃO for mobile (ou seja, é PC), troca o manifesto para a versão PC
+            if (!isMobile) {
+                console.log("Modo Desktop Detectado: Configurando instalação para PC...");
+                const manifest = document.getElementById('manifest-link');
+                manifest.setAttribute('href', 'manifest_pc.json'); // Aponta para o manifesto que abre o Index_github_pc.html
+            }
+        })();
+    </script>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
 
@@ -28,16 +43,16 @@
 
         <!-- Logo -->
         <div class="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
-            <img src="https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Icone.png?raw=true" class="w-14 h-14 bounce">
+            <img src="https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true" class="w-14 h-14 bounce">
         </div>
 
         <h1 class="text-2xl font-bold text-gray-800 mb-2">Instalar PontoWeb</h1>
-        <p class="text-gray-500 mb-8 text-sm">Tenha acesso rápido ao sistema de ponto diretamente da tela inicial do seu celular.</p>
+        <p id="deviceText" class="text-gray-500 mb-8 text-sm">Tenha acesso rápido ao sistema de ponto.</p>
 
         <!-- Botão de Instalação (Android/Desktop) -->
         <button id="installBtn" class="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-green-700 transition-all active:scale-95 hidden flex items-center justify-center gap-2">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-            Instalar Aplicativo
+            <span id="installBtnText">Instalar Aplicativo</span>
         </button>
 
         <!-- Instruções iOS (iPhone) -->
@@ -54,31 +69,46 @@
         </div>
 
         <!-- Botão Acessar Web (Caso já tenha instalado ou queira usar no browser) -->
-        <a href="index.html" class="block mt-6 text-green-600 font-bold text-sm hover:underline">
+        <a id="openAppBtn" href="index.html" class="block mt-6 text-green-600 font-bold text-sm hover:underline">
             Já instalou? Abrir PontoWeb
         </a>
         
-        <p class="text-xs text-gray-400 mt-8">Versão de Testes</p>
+        <p class="text-xs text-gray-400 mt-8">Versão 1.0 • Unespar</p>
     </div>
 
     <script>
-        // 1. Registrar Service Worker (Obrigatório para PWA ser instalável)
+        // 1. Configuração de Links com base no Dispositivo
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const openAppBtn = document.getElementById('openAppBtn');
+        const deviceText = document.getElementById('deviceText');
+        const installBtnText = document.getElementById('installBtnText');
+
+        if (isMobile) {
+            // Mobile: Usa index.html (Versão Celular)
+            openAppBtn.href = "index.html";
+            deviceText.textContent = "Instale o app no seu celular para acesso rápido.";
+        } else {
+            // PC: Usa Index_github_pc.html (Versão PC)
+            openAppBtn.href = "Index_github_pc.html";
+            deviceText.textContent = "Instale a versão Desktop no seu computador.";
+            installBtnText.textContent = "Instalar no PC";
+        }
+
+        // 2. Registrar Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js')
-                .then(() => console.log('SW registrado para instalação'))
+                .then(() => console.log('SW registrado'))
                 .catch(err => console.error('Erro SW', err));
         }
 
-        // 2. Lógica de Instalação (Android/Chrome/PC)
+        // 3. Lógica de Instalação (PWA)
         let deferredPrompt;
         const installBtn = document.getElementById('installBtn');
         const iosInstruction = document.getElementById('iosInstruction');
 
         window.addEventListener('beforeinstallprompt', (e) => {
-            // Previne o banner automático padrão do Chrome (para usarmos nosso botão)
             e.preventDefault();
             deferredPrompt = e;
-            // Mostra o botão personalizado
             installBtn.classList.remove('hidden');
         });
 
@@ -93,7 +123,7 @@
             }
         });
 
-        // 3. Detecção iOS (iPhone não dispara beforeinstallprompt, precisa de instruções manuais)
+        // 4. Detecção iOS
         const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
@@ -101,14 +131,12 @@
             iosInstruction.classList.remove('hidden');
         }
 
-        // 4. Se já estiver instalado/standalone, muda o texto
+        // 5. Se já estiver instalado/standalone
         if (isStandalone) {
             document.querySelector('h1').textContent = "PontoWeb Instalado";
-            document.querySelector('p').textContent = "O aplicativo já está instalado neste dispositivo.";
+            document.querySelector('p').textContent = "O aplicativo já está pronto para uso.";
             installBtn.style.display = 'none';
         }
     </script>
 </body>
-
 </html>
-
