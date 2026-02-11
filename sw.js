@@ -46,7 +46,7 @@ self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   
   // Define a URL correta (usa o que veio na notificação ou o link fixo)
-  const urlToOpen = event.notification.data?.url || 'https://luizhenrinq1-svg.github.io/pontowebtestets/';
+  const urlToOpen = event.notification.data?.url || 'https://luizhenrinq1-svg.github.io/testepontoweb/';
 
   event.waitUntil(
     clients.matchAll({type: 'window', includeUncontrolled: true}).then( windowClients => {
