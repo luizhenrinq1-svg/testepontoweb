@@ -29,7 +29,7 @@ messaging.onBackgroundMessage((payload) => {
   const notificationOptions = {
     body: body,
     icon: 'https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Icone.png?raw=true',
-    badge: 'https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Icone.png?raw=true',
+    badge: 'https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true',
     vibrate: [500, 200, 500, 200, 500],
     requireInteraction: true,
     tag: 'ponto-notification',
