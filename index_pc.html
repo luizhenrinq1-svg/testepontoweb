@@ -16,25 +16,25 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- CRIPTOGRAFIA (AES) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 
     <style>
-      body { background-color: #eef2f6; font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; } /* Prevent scroll */
+      body { background-color: #eef2f6; font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
       .fade-in { animation: fadeIn 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
       @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       .spinner { border: 4px solid #e5e7eb; width: 36px; height: 36px; border-radius: 50%; border-left-color: #16a34a; animation: spin 1s linear infinite; }
       @keyframes spin { 100% { transform: rotate(360deg); } }
-      
-      /* Glassmorphism subtle effect */
-      .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
     </style>
   </head>
   <body>
     <div id="root"></div>
 
-    <!-- SHIM (Mesmo do Mobile) -->
+    <!-- SHIM -->
     <script>
       const API_URL = "https://script.google.com/macros/s/AKfycbwYSqYPf-8ckGroc3TlZHD2n5LhTSDD04auBHEgXxzo_OkJCfbO-Jv3PlKcNtPbV-36MA/exec";
       const ExternalBridge = {
@@ -71,8 +71,9 @@
     <script type="text/babel">
       const { useState, useEffect, useRef } = React;
       
-      // Chaves de Cache
-      const CACHE_CREDENTIALS = 'pontoweb_credentials_v1'; // { id, token, password, nome }
+      // CHAVES DE ARMAZENAMENTO
+      const STORAGE_PUBLIC = 'pontoweb_public_info'; // Guarda só o nome (não sensível)
+      const STORAGE_SECURE = 'pontoweb_encrypted_blob'; // Guarda ID e Token CRIPTOGRAFADOS
       const CACHE_KEY_DATA = 'pontoweb_user_data_cache';
 
       // Ícones SVG
@@ -84,31 +85,31 @@
         LogOut: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
         User: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
         Lock: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>,
-        Eye: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>,
         Copy: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
       };
 
       function DesktopApp() {
         // --- ESTADOS DO SISTEMA ---
-        const [credentials, setCredentials] = useState(() => JSON.parse(localStorage.getItem(CACHE_CREDENTIALS) || 'null'));
+        const [publicInfo, setPublicInfo] = useState(() => JSON.parse(localStorage.getItem(STORAGE_PUBLIC) || 'null'));
         const [cachedData] = useState(() => JSON.parse(localStorage.getItem(CACHE_KEY_DATA) || 'null'));
         
         // Estados de Sessão
-        const [sessionUser, setSessionUser] = useState(null); // Usuário autenticado na sessão atual
-        const [view, setView] = useState('loading_init'); // 'loading_init', 'login_link', 'new_password', 'login_password', 'app'
+        const [sessionUser, setSessionUser] = useState(null); // { id, token, nome } - Só existe na RAM
+        const [view, setView] = useState('loading_init'); 
         
         // Dados do App
-        const [bolsistaName, setBolsistaName] = useState(cachedData?.nome || '');
+        const [bolsistaName, setBolsistaName] = useState(cachedData?.nome || publicInfo?.nome || '');
         const [lastAction, setLastAction] = useState(cachedData?.lastAction || null);
         const [entryTime, setEntryTime] = useState(cachedData?.entryTime || null);
         const [exitTime, setExitTime] = useState(cachedData?.exitTime || null);
         const [location, setLocation] = useState(null);
-        const [appStatus, setAppStatus] = useState('ready'); // status dentro do app: ready, punching, sending, success
+        const [appStatus, setAppStatus] = useState('ready');
         
         // Inputs & Forms
         const [inputUrl, setInputUrl] = useState('');
         const [inputPass, setInputPass] = useState('');
         const [generatedPass, setGeneratedPass] = useState('');
+        const [tempCredentials, setTempCredentials] = useState(null); // Usado apenas na transição de criação
         
         const [punchType, setPunchType] = useState(null);
         const [result, setResult] = useState(null);
@@ -119,8 +120,10 @@
         useEffect(() => { const t=setInterval(()=>setCurrentTime(new Date()),1000); return ()=>clearInterval(t); }, []);
 
         useEffect(() => {
-          // Verifica se já temos credenciais salvas
-          if (credentials) {
+          // Verifica se existe o "cofre" criptografado
+          const encryptedBlob = localStorage.getItem(STORAGE_SECURE);
+          
+          if (encryptedBlob && publicInfo) {
              setView('login_password');
           } else {
              // Verifica URL se é um primeiro acesso via link direto
@@ -135,7 +138,7 @@
           }
         }, []);
 
-        // --- LÓGICA DE AUTENTICAÇÃO ---
+        // --- LÓGICA DE AUTENTICAÇÃO SEGURA ---
 
         const handleFirstAccess = (id, token) => {
            setView('loading_init');
@@ -145,32 +148,102 @@
                  alert(res.error);
                  setView('login_link');
               } else {
-                 // GERA SENHA AUTOMÁTICA
+                 // 1. GERA SENHA AUTOMÁTICA
                  const randomToken = Math.random().toString(36).slice(-6).toUpperCase();
                  const newPassword = `Bolsista${randomToken}`;
                  
-                 const newCreds = {
+                 // 2. PREPARA DADOS TEMPORÁRIOS
+                 const userInfo = {
                     id: id,
                     token: token,
-                    nome: res.nome || 'Bolsista',
-                    password: newPassword
+                    nome: res.nome || 'Bolsista'
                  };
                  
-                 // Salva credenciais (ainda não loga, mostra senha primeiro)
                  setGeneratedPass(newPassword);
-                 setCredentials(newCreds); // Atualiza estado
-                 localStorage.setItem(CACHE_CREDENTIALS, JSON.stringify(newCreds));
-                 
-                 // Atualiza cache de dados também
-                 localStorage.setItem(CACHE_KEY_DATA, JSON.stringify(res));
+                 setTempCredentials(userInfo);
                  setBolsistaName(res.nome);
                  
-                 setView('new_password'); // Mostra modal de senha
+                 // Salva apenas o nome (público) para a tela de login
+                 const pubInfo = { nome: res.nome };
+                 localStorage.setItem(STORAGE_PUBLIC, JSON.stringify(pubInfo));
+                 setPublicInfo(pubInfo);
+                 
+                 // Atualiza cache de dados
+                 localStorage.setItem(CACHE_KEY_DATA, JSON.stringify(res));
+                 
+                 setView('new_password'); // Mostra modal de senha e PEDE CONFIRMAÇÃO
               }
            }).withFailureHandler(() => {
               alert("Erro de conexão ao validar link.");
               setView('login_link');
            }).getBolsistaInfo(id, token);
+        };
+
+        const confirmPasswordCopy = () => {
+           // 3. CRIPTOGRAFA E SALVA AO CONFIRMAR
+           // A senha NÃO é salva. Ela é usada como CHAVE para trancar o cofre.
+           if(!tempCredentials || !generatedPass) return;
+           
+           try {
+              const dataToEncrypt = JSON.stringify(tempCredentials);
+              const encrypted = CryptoJS.AES.encrypt(dataToEncrypt, generatedPass).toString();
+              
+              localStorage.setItem(STORAGE_SECURE, encrypted);
+              
+              // Limpa memória sensível
+              setSessionUser(tempCredentials);
+              setTempCredentials(null);
+              setGeneratedPass(''); // Apaga senha da memória
+              
+              setView('app');
+              initGPS();
+           } catch(e) {
+              alert("Erro de criptografia. Tente novamente.");
+           }
+        };
+
+        const handlePasswordLogin = (e) => {
+           e.preventDefault();
+           
+           const encryptedBlob = localStorage.getItem(STORAGE_SECURE);
+           if (!encryptedBlob) {
+              alert("Erro de dados locais. Reconfigure sua conta.");
+              setView('login_link');
+              return;
+           }
+
+           try {
+              // TENTA ABRIR O COFRE COM A SENHA DIGITADA
+              const bytes = CryptoJS.AES.decrypt(encryptedBlob, inputPass);
+              const decryptedData = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+              
+              if (decryptedData && decryptedData.id && decryptedData.token) {
+                 // SUCESSO: Cofre aberto
+                 setSessionUser(decryptedData);
+                 setBolsistaName(decryptedData.nome);
+                 setView('app');
+                 loadAppData(decryptedData.id, decryptedData.token);
+                 initGPS();
+                 setInputPass(''); // Limpa campo
+              } else {
+                 throw new Error();
+              }
+           } catch (err) {
+              alert("Senha incorreta.");
+              setInputPass('');
+           }
+        };
+
+        const logout = () => {
+           if(confirm("Deseja remover esta conta deste computador? Você precisará do link original novamente.")) {
+              localStorage.removeItem(STORAGE_PUBLIC);
+              localStorage.removeItem(STORAGE_SECURE);
+              localStorage.removeItem(CACHE_KEY_DATA);
+              setPublicInfo(null);
+              setSessionUser(null);
+              setInputPass('');
+              setView('login_link');
+           }
         };
 
         const handleManualLinkSubmit = (e) => {
@@ -184,31 +257,6 @@
                 else alert("Link incompleto.");
              } else alert("Link inválido.");
            } catch(err) { alert("Link inválido."); }
-        };
-
-        const handlePasswordLogin = (e) => {
-           e.preventDefault();
-           if (inputPass === credentials.password) {
-              // LOGIN SUCESSO
-              setSessionUser(credentials);
-              setBolsistaName(credentials.nome);
-              setView('app');
-              loadAppData(credentials.id, credentials.token); // Atualiza dados frescos
-              initGPS();
-           } else {
-              alert("Senha incorreta.");
-           }
-        };
-
-        const logout = () => {
-           if(confirm("Deseja realmente sair? Isso removerá sua senha salva neste computador.")) {
-              localStorage.removeItem(CACHE_CREDENTIALS);
-              localStorage.removeItem(CACHE_KEY_DATA);
-              setCredentials(null);
-              setSessionUser(null);
-              setInputPass('');
-              setView('login_link');
-           }
         };
 
         // --- LÓGICA DO APP (PONTO) ---
@@ -287,27 +335,27 @@
           </div>
         );
 
-        // TELA 2: EXIBIÇÃO DE NOVA SENHA (Só aparece uma vez)
+        // TELA 2: EXIBIÇÃO DE NOVA SENHA (Criptografia acontece ao clicar)
         if (view === 'new_password') return (
           <div className="h-screen w-full flex items-center justify-center p-4 bg-green-600/10 backdrop-blur-sm">
              <div className="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md text-center fade-in border-2 border-green-500 relative">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600"><Icon.Lock/></div>
-                <h2 className="text-2xl font-bold text-gray-800">Senha Criada!</h2>
-                <p className="text-gray-500 text-sm mb-6 mt-2">Esta senha foi gerada automaticamente para você. Anote-a em um local seguro, você precisará dela para os próximos acessos.</p>
+                <h2 className="text-2xl font-bold text-gray-800">Senha Segura Criada!</h2>
+                <p className="text-gray-500 text-sm mb-6 mt-2">Esta senha é a <strong>ÚNICA CHAVE</strong> para acessar seus dados neste PC. Se você a perder, precisará usar o link original novamente.</p>
                 
                 <div className="bg-gray-100 p-4 rounded-xl border border-gray-200 mb-6 flex items-center justify-between group cursor-pointer" onClick={() => navigator.clipboard.writeText(generatedPass)}>
                    <span className="font-mono text-xl font-bold text-gray-800 tracking-wider w-full text-center">{generatedPass}</span>
                    <span className="text-gray-400 group-hover:text-green-600"><Icon.Copy/></span>
                 </div>
 
-                <button onClick={() => { setView('app'); setSessionUser(credentials); initGPS(); }} className="w-full bg-green-600 text-white py-4 rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg">
-                   Entendi, já copiei a senha
+                <button onClick={confirmPasswordCopy} className="w-full bg-green-600 text-white py-4 rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg">
+                   Copiei a senha, pode criptografar
                 </button>
              </div>
           </div>
         );
 
-        // TELA 3: LOGIN POR SENHA (Acesso recorrente)
+        // TELA 3: LOGIN POR SENHA (Descriptografia)
         if (view === 'login_password') return (
           <div className="h-screen w-full flex items-center justify-center p-4 bg-gray-50">
              <div className="bg-white p-12 rounded-3xl shadow-xl w-full max-w-md text-center fade-in border border-gray-100">
@@ -316,8 +364,8 @@
                    <div className="absolute bottom-0 right-0 bg-green-500 w-6 h-6 rounded-full border-4 border-white"></div>
                 </div>
                 
-                <h1 className="text-2xl font-bold text-gray-800 mb-1">Olá, {credentials?.nome?.split(' ')[0]}</h1>
-                <p className="text-gray-400 text-xs mb-8 uppercase tracking-wider">PontoWeb Seguro</p>
+                <h1 className="text-2xl font-bold text-gray-800 mb-1">Olá, {publicInfo?.nome?.split(' ')[0]}</h1>
+                <p className="text-gray-400 text-xs mb-8 uppercase tracking-wider">Acesso Seguro (Criptografado)</p>
 
                 <form onSubmit={handlePasswordLogin}>
                    <div className="relative mb-6">
@@ -331,7 +379,7 @@
                         autoFocus
                       />
                    </div>
-                   <button className="w-full bg-green-600 text-white py-4 rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg active:scale-95">Entrar no Sistema</button>
+                   <button className="w-full bg-green-600 text-white py-4 rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg active:scale-95">Desbloquear</button>
                 </form>
 
                 <button onClick={logout} className="mt-8 text-xs text-gray-400 hover:text-red-500 hover:underline transition-colors">
@@ -365,7 +413,7 @@
               <div className="w-80 bg-slate-50 p-10 flex flex-col border-r border-gray-100 relative z-10 shrink-0">
                  <div className="mb-10">
                     <h1 className="text-3xl font-bold text-green-700 flex items-center gap-3 tracking-tight"><Icon.Clock/> PontoWeb</h1>
-                    <p className="text-gray-400 text-xs ml-10 font-medium tracking-wider uppercase mt-1">Versão PC 2.0 (Secure)</p>
+                    <p className="text-gray-400 text-xs ml-10 font-medium tracking-wider uppercase mt-1">Versão PC 3.0 (AES-256)</p>
                  </div>
                  
                  <div className="bg-white p-6 rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] border border-gray-100 mb-6">
