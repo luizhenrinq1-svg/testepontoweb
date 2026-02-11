@@ -1,7 +1,7 @@
 {
   "name": "PontoWeb Unespar (PC)",
   "short_name": "PontoWeb",
-  "start_url": "./Index_github_pc.html",
+  "start_url": "./index_pc.html",
   "display": "standalone",
   "background_color": "#eef2f6",
   "theme_color": "#166534",
