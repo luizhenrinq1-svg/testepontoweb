@@ -12,7 +12,7 @@ const firebaseConfig = {
   projectId: "pontoweb-dc8dd",
   storageBucket: "pontoweb-dc8dd.firebasestorage.app",
   messagingSenderId: "465750633035",
-  appId: "2:465750633035:web:282efd14b807e2a3823bce"
+  appId: "1:465750633035:web:282efd14b807e2a3823bce"
 };
 
 // Inicializa Firebase no Service Worker
