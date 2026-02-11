@@ -69,7 +69,7 @@
         </div>
 
         <!-- Botão Acessar Web (Caso já tenha instalado ou queira usar no browser) -->
-        <a id="openAppBtn" href="index.html" class="block mt-6 text-green-600 font-bold text-sm hover:underline">
+        <a id="openAppBtn" href="#" class="block mt-6 text-green-600 font-bold text-sm hover:underline">
             Já instalou? Abrir PontoWeb
         </a>
         
@@ -84,12 +84,12 @@
         const installBtnText = document.getElementById('installBtnText');
 
         if (isMobile) {
-            // Mobile: Usa index.html (Versão Celular)
-            openAppBtn.href = "index.html";
+            // Mobile: Usa URL direta do index.html (Versão Celular)
+            openAppBtn.href = "https://luizhenrinq1-svg.github.io/testepontoweb/index.html";
             deviceText.textContent = "Instale o app no seu celular para acesso rápido.";
         } else {
-            // PC: Usa Index_github_pc.html (Versão PC)
-            openAppBtn.href = "index_pc.html";
+            // PC: Usa URL direta do index_pc.html (Versão PC)
+            openAppBtn.href = "https://luizhenrinq1-svg.github.io/testepontoweb/index_pc.html";
             deviceText.textContent = "Instale a versão Desktop no seu computador.";
             installBtnText.textContent = "Instalar no PC";
         }
@@ -140,4 +140,3 @@
     </script>
 </body>
 </html>
-
