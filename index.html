@@ -292,6 +292,7 @@
         if(status==='waiting_link') return <div className="h-screen flex items-center justify-center p-4 bg-white"><form onSubmit={handleManualLogin} className="w-full max-w-sm text-center fade-in"><div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600"><Icon.Link/></div><h1 className="text-xl font-bold mb-2 text-gray-800">Identificação</h1><p className="text-gray-500 mb-6 text-sm">Cole seu link pessoal para acessar.</p><input value={inputUrl} onChange={e=>setInputUrl(e.target.value)} placeholder="Cole aqui..." className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-green-500 outline-none"/><button className="bg-green-600 text-white w-full py-3 rounded-lg font-bold shadow-lg scale-click">Entrar</button></form></div>;
         if(status==='loading') return (
           <div className="h-screen flex flex-col items-center justify-center bg-white gap-4">
+            {/* SPLASH SCREEN COM O LOGO SOLICITADO */}
             <img src="https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true" className="w-48 h-48 animate-pulse" />
             <div className="spinner"></div>
           </div>
