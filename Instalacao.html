@@ -47,7 +47,12 @@
         </div>
 
         <h1 class="text-2xl font-bold text-gray-800 mb-2">Instalar PontoWeb</h1>
-        <p id="deviceText" class="text-gray-500 mb-8 text-sm">Tenha acesso rápido ao sistema de ponto.</p>
+        <p id="deviceText" class="text-gray-500 mb-4 text-sm">Tenha acesso rápido ao sistema de ponto.</p>
+
+        <!-- NOVO: Identificação do Navegador -->
+        <div id="browserInfo" class="mb-8 h-6 text-xs font-medium flex justify-center items-center">
+            <!-- Será preenchido pelo JS -->
+        </div>
 
         <!-- Botão de Instalação (Android/Desktop) -->
         <button id="installBtn" class="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-green-700 transition-all active:scale-95 hidden flex items-center justify-center gap-2">
@@ -73,7 +78,7 @@
             Já instalou? Abrir PontoWeb
         </a>
         
-        <p class="text-xs text-gray-400 mt-8">Versão de Teste</p>
+        <p class="text-xs text-gray-400 mt-8">Versão 1.0 • Unespar</p>
     </div>
 
     <script>
@@ -82,6 +87,7 @@
         const openAppBtn = document.getElementById('openAppBtn');
         const deviceText = document.getElementById('deviceText');
         const installBtnText = document.getElementById('installBtnText');
+        const browserInfo = document.getElementById('browserInfo');
 
         if (isMobile) {
             // Mobile: Usa URL direta do index.html (Versão Celular)
@@ -123,12 +129,23 @@
             }
         });
 
-        // 4. Detecção iOS
+        // 4. Detecção iOS e Browser (Chrome)
         const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
         if (isIos && !isStandalone) {
             iosInstruction.classList.remove('hidden');
+            // No iOS não detectamos "Chrome" especificamente pois todos usam WebKit e o comportamento de instalação é manual
+        } else if (!isStandalone) {
+            // Detecção de Chrome (Desktop ou Android)
+            // Regex verifica se tem 'Chrome', se é do 'Google Inc', e exclui Edge (Edg) e Opera (OPR)
+            const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor) && !/Edg|OPR/.test(navigator.userAgent);
+            
+            if (isChrome) {
+                browserInfo.innerHTML = '<span class="inline-flex items-center gap-1 text-green-600 bg-green-50 px-3 py-1 rounded-full"><svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg> Navegador Chrome Detectado</span>';
+            } else {
+                browserInfo.innerHTML = '<span class="inline-flex items-center gap-1 text-orange-600 bg-orange-50 px-3 py-1 rounded-full"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg> Recomendado usar Google Chrome</span>';
+            }
         }
 
         // 5. Se já estiver instalado/standalone
@@ -136,9 +153,8 @@
             document.querySelector('h1').textContent = "PontoWeb Instalado";
             document.querySelector('p').textContent = "O aplicativo já está pronto para uso.";
             installBtn.style.display = 'none';
+            if(browserInfo) browserInfo.style.display = 'none'; // Esconde aviso de browser se já estiver instalado
         }
     </script>
 </body>
 </html>
-
-
