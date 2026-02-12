@@ -423,6 +423,12 @@
         const isEntryBlocked = lastAction==='Entrada'||lastAction==='Intervalo-Fim';
         const isExitBlocked = lastAction==='Saida';
 
+        // LÓGICA DE TURNOS NA VISUALIZAÇÃO
+        const getTimes = (str) => str ? str.split(' / ') : [];
+        const entList = getTimes(entryTime);
+        const saiList = getTimes(exitTime);
+        const maxTurnos = Math.max(entList.length, saiList.length, 1);
+
         return (
           <>
             <Modal config={modalConfig} onClose={closeModal} />
@@ -442,7 +448,7 @@
                       </div>
                    </div>
                    
-                   <div className="bg-white p-6 rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] border border-gray-100 mb-6">
+                   <div className="bg-white p-6 rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] border border-gray-100 mb-6 relative overflow-y-auto max-h-[40vh]">
                       <div className="flex items-center gap-3 mb-4 border-b border-gray-50 pb-4">
                           <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 flex-shrink-0"><LucideIcon name="user" size={20}/></div>
                           <div className="min-w-0">
@@ -450,15 +456,27 @@
                               <h2 className="text-base font-bold text-gray-800 leading-tight break-words">{bolsistaName}</h2>
                           </div>
                       </div>
-                      <div className="space-y-3">
-                         <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
-                             <span className="text-xs font-semibold text-gray-500">Entrada</span> 
-                             <span className="font-mono font-bold text-green-700 text-right text-xs">{entryTime || '--:--'}</span>
-                         </div>
-                         <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
-                             <span className="text-xs font-semibold text-gray-500">Saída</span> 
-                             <span className="font-mono font-bold text-red-700 text-right text-xs">{exitTime || '--:--'}</span>
-                         </div>
+                      
+                      <div className="space-y-4">
+                        {Array.from({ length: maxTurnos }).map((_, i) => (
+                          <div key={i} className={`p-3 rounded-xl border ${i > 0 ? 'bg-slate-50/50 border-slate-100 mt-2' : 'bg-slate-50 border-transparent'}`}>
+                             {maxTurnos > 1 && (
+                               <div className="mb-2 pb-1 border-b border-slate-200/50">
+                                 <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Turno {i + 1}</span>
+                               </div>
+                             )}
+                             <div className="space-y-2">
+                               <div className="flex justify-between items-center">
+                                   <span className="text-xs font-semibold text-gray-500">Entrada</span> 
+                                   <span className="font-mono font-bold text-green-700 text-xs">{entList[i] || '--:--'}</span>
+                               </div>
+                               <div className="flex justify-between items-center">
+                                   <span className="text-xs font-semibold text-gray-500">Saída</span> 
+                                   <span className="font-mono font-bold text-red-700 text-xs">{saiList[i] || '--:--'}</span>
+                               </div>
+                             </div>
+                          </div>
+                        ))}
                       </div>
                    </div>
 
