@@ -391,8 +391,18 @@
                setResult(res); setAppStatus('success'); 
                const c=JSON.parse(localStorage.getItem(CACHE_KEY_DATA)||'{}'); 
                c.lastAction=punchType;
-               if(punchType==='Entrada') c.entryTime=res.timestamp.split(' ')[1].substring(0,5);
-               if(punchType==='Saida') c.exitTime=res.timestamp.split(' ')[1].substring(0,5);
+               
+               // ATUALIZAÇÃO: Suporte a múltiplos turnos (concatena horários na visualização local)
+               const newTime = res.timestamp.split(' ')[1].substring(0,5);
+               if(punchType==='Entrada') {
+                   if (c.entryTime && !c.entryTime.includes(newTime)) c.entryTime += ' / ' + newTime;
+                   else if (!c.entryTime) c.entryTime = newTime;
+               }
+               if(punchType==='Saida') {
+                   if (c.exitTime && !c.exitTime.includes(newTime)) c.exitTime += ' / ' + newTime;
+                   else if (!c.exitTime) c.exitTime = newTime;
+               }
+
                localStorage.setItem(CACHE_KEY_DATA,JSON.stringify(c)); 
                setEntryTime(c.entryTime); setExitTime(c.exitTime); setLastAction(punchType);
              } else { showAlert("Erro", res.msg, "error"); setAppStatus('ready'); } 
@@ -443,11 +453,11 @@
                       <div className="space-y-3">
                          <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
                              <span className="text-xs font-semibold text-gray-500">Entrada</span> 
-                             <span className="font-mono font-bold text-green-700">{entryTime || '--:--'}</span>
+                             <span className="font-mono font-bold text-green-700 text-right text-xs">{entryTime || '--:--'}</span>
                          </div>
                          <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
                              <span className="text-xs font-semibold text-gray-500">Saída</span> 
-                             <span className="font-mono font-bold text-red-700">{exitTime || '--:--'}</span>
+                             <span className="font-mono font-bold text-red-700 text-right text-xs">{exitTime || '--:--'}</span>
                          </div>
                       </div>
                    </div>
@@ -482,7 +492,7 @@
                              {currentTime.toLocaleTimeString('pt-BR').substring(0,5)}
                              <span className="text-3xl text-gray-300 ml-1 font-normal">{currentTime.getSeconds().toString().padStart(2,'0')}</span>
                         </p>
-                        <img src="https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true" className="w-0 h-0 object-contain drop-shadow-sm -mt-6 ml-12" />
+                        <img src="https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true" className="w-24 h-24 object-contain drop-shadow-sm -mt-6 ml-12" />
                       </div>
                    </div>
 
