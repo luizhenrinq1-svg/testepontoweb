@@ -9,12 +9,12 @@
   "icons": [
     {
       "src": "https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Icone.png?raw=true",
-      "sizes": "912x912",
+      "sizes": "512x512",
       "type": "image/png"
     },
     {
       "src": "https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Logo.png?raw=true",
-      "sizes": "912x912",
+      "sizes": "512x512",
       "type": "image/png"
     }
   ],
