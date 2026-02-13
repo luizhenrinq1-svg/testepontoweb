@@ -260,6 +260,31 @@
 
         useEffect(() => { const t=setInterval(()=>setCurrentTime(new Date()),1000); return ()=>clearInterval(t); }, []);
 
+        // --- CORREÇÃO 1: MONITORAMENTO ROBUSTO DE GPS (WatchPosition) ---
+        // Isso garante que assim que o usuário logar, o GPS comece a ser rastreado continuamente,
+        // corrigindo o problema de ter que reiniciar o app.
+        useEffect(() => {
+          let watchId;
+          if (sessionUser && appStatus === 'ready') {
+             if (navigator.geolocation) {
+                // Tenta pegar a posição continuamente
+                watchId = navigator.geolocation.watchPosition(
+                   (position) => {
+                      setLocation(position.coords);
+                   },
+                   (error) => {
+                      console.warn("Erro GPS:", error);
+                      // Não zeramos location aqui para evitar flicker se perder sinal momentaneamente
+                   },
+                   { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+                );
+             }
+          }
+          return () => {
+             if (watchId) navigator.geolocation.clearWatch(watchId);
+          };
+        }, [sessionUser, appStatus]); // Recria o watcher se o usuário logar
+
         useEffect(() => {
           const encryptedBlob = localStorage.getItem(STORAGE_SECURE);
           if (encryptedBlob && publicInfo) {
@@ -300,10 +325,14 @@
               const encrypted = CryptoJS.AES.encrypt(JSON.stringify(tempCredentials), generatedPass).toString();
               localStorage.setItem(STORAGE_SECURE, encrypted);
               setSessionUser(tempCredentials);
+              
+              // --- CORREÇÃO: Carrega dados do App imediatamente para garantir consistência ---
+              loadAppData(tempCredentials.id, tempCredentials.token);
+              
               setTempCredentials(null);
               setGeneratedPass(''); 
               setView('app');
-              initGPS();
+              // initGPS removido pois o useEffect com watchPosition cuidará disso
            } catch(e) { showAlert("Erro", "Criptografia falhou.", "error"); }
         };
 
@@ -319,7 +348,7 @@
                  setBolsistaName(data.nome);
                  setView('app');
                  loadAppData(data.id, data.token);
-                 initGPS();
+                 // initGPS removido, useEffect cuida disso
                  setInputPass(''); 
               } else throw new Error();
            } catch (err) { showAlert("Erro", "Senha incorreta.", "error"); setInputPass(''); }
@@ -378,8 +407,6 @@
            showAlert("Sucesso", "Configurações de alerta salvas e sincronizadas!", "info");
         };
 
-        const initGPS = () => { if(navigator.geolocation) navigator.geolocation.getCurrentPosition(p=>setLocation(p.coords),console.warn,{enableHighAccuracy:true}); };
-
         const startCamera = async (type) => {
           setPunchType(type);
           setAppStatus('punching');
@@ -420,7 +447,7 @@
 
         if (view === 'loading_init') return <div className="h-screen w-full flex items-center justify-center"><div className="spinner"></div></div>;
 
-        // VIEWS SIMPLIFICADAS PARA ESPAÇO (Mesma lógica de antes para Login/Senha/Sucesso)
+        // VIEWS SIMPLIFICADAS PARA ESPAÇO
         if (view === 'login_link') return ( <> <Modal config={modalConfig} onClose={closeModal} /> <div className="h-screen w-full flex items-center justify-center p-4 bg-gray-50"> <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-lg text-center fade-in border border-gray-100 relative"> <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600"><LucideIcon name="map" size={32}/></div> <h1 className="text-2xl font-bold mb-2 text-gray-800">Primeiro Acesso</h1> <p className="text-gray-500 mb-8 text-sm">Cole seu link de acesso pessoal para configurar.</p> <form onSubmit={handleManualLinkSubmit} className="flex gap-2"> <input value={inputUrl} onChange={e=>setInputUrl(e.target.value)} placeholder="Cole o link aqui..." className="flex-1 p-3 border border-gray-300 rounded-lg outline-none focus:border-green-500 transition-colors"/> <button className="bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-700 transition-colors shadow-lg">Configurar</button> </form> </div> </div> </> );
         
         if (view === 'new_password') return ( <> <Modal config={modalConfig} onClose={closeModal} /> <div className="h-screen w-full flex items-center justify-center p-4 bg-green-600/10 backdrop-blur-sm"> <div className="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md text-center fade-in border-2 border-green-500 relative"> <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600"><LucideIcon name="lock" size={32}/></div> <h2 className="text-2xl font-bold text-gray-800">Senha Segura Criada!</h2> <p className="text-gray-500 text-sm mb-6 mt-2">Anote esta senha. Ela é a única chave para acessar seus dados neste PC.</p> <div className="bg-gray-100 p-4 rounded-xl border border-gray-200 mb-6 flex items-center justify-between group cursor-pointer" onClick={() => navigator.clipboard.writeText(generatedPass)}> <span className="font-mono text-xl font-bold text-gray-800 tracking-wider w-full text-center">{generatedPass}</span> <span className="text-gray-400 group-hover:text-green-600"><LucideIcon name="copy"/></span> </div> <button onClick={confirmPasswordCopy} className="w-full bg-green-600 text-white py-4 rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg"> Copiei a senha, pode criptografar </button> </div> </div> </> );
@@ -429,10 +456,18 @@
 
         if(appStatus==='success') return ( <> <Modal config={modalConfig} onClose={closeModal} /> <div className="h-screen w-full flex items-center justify-center bg-green-50/50"> <div className="bg-white p-12 rounded-3xl shadow-xl text-center fade-in max-w-md w-full border border-gray-100"> <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600"><LucideIcon name="check" size={48}/></div> <h2 className="text-3xl font-bold text-gray-800 mb-2">Ponto Registrado!</h2> <p className="text-gray-500 text-xl font-mono mb-8">{result?.timestamp}</p> <button onClick={() => {setResult(null); setAppStatus('ready');}} className="w-full bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-black transition-colors shadow-lg">Voltar ao Início</button> </div> </div> </> );
 
+        // --- CORREÇÃO 2: TELA DE CARREGAMENTO NO ENVIO DA FOTO ---
+        if(appStatus==='sending') return (
+           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] flex flex-col items-center justify-center fade-in">
+              <div className="spinner w-20 h-20 border-4 border-t-green-500 border-r-green-500 border-b-green-700 border-l-transparent mb-6"></div>
+              <h2 className="text-white text-3xl font-bold animate-pulse tracking-tight">Registrando...</h2>
+              <p className="text-gray-400 mt-2 font-medium">Enviando sua foto e localização segura.</p>
+           </div>
+        );
+
         const isEntryBlocked = lastAction==='Entrada'||lastAction==='Intervalo-Fim';
         const isExitBlocked = lastAction==='Saida';
 
-        // LÓGICA DE TURNOS NA VISUALIZAÇÃO
         const getTimes = (str) => str ? str.split(' / ') : [];
         const entList = getTimes(entryTime);
         const saiList = getTimes(exitTime);
@@ -448,7 +483,6 @@
                 
                 {/* SIDEBAR */}
                 <div className="w-80 bg-slate-50 p-10 flex flex-col border-r border-gray-100 relative z-10 shrink-0">
-                   {/* CABEÇALHO DO SIDEBAR MODIFICADO */}
                    <div className="mb-10 flex items-center gap-4">
                       <img src="https://github.com/luizhenrinq1-svg/testepontoweb/blob/main/Icone.png?raw=true" className="w-20 h-20 object-contain"/>
                       <div className="flex flex-col justify-center -mt-2">
@@ -495,7 +529,8 @@
                       </button>
                       
                       <div className="text-xs text-gray-400 flex items-center gap-2 px-2 pt-2 justify-center">
-                         <LucideIcon name="map-pin" size={12}/> {location ? 'GPS Calibrado' : 'Buscando Localização...'}
+                         <LucideIcon name={location ? "map-pin" : "loader"} size={12} className={!location ? "animate-spin" : ""}/> 
+                         {location ? 'GPS Calibrado' : 'Buscando Localização...'}
                       </div>
                       
                       <button onClick={() => { setSessionUser(null); setInputPass(''); setView('login_password'); }} className="w-full bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm">
