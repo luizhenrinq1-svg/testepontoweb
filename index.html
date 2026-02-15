@@ -312,11 +312,17 @@
           </div>
         );
 
-        const isEntryBlocked = lastAction==='Entrada'||lastAction==='Intervalo-Fim';
-        const isExitBlocked = lastAction==='Saida';
+        // --- LÓGICA DE BLOQUEIO DE INTERVALO ---
+        const isWorking = lastAction==='Entrada'||lastAction==='Intervalo-Fim';
+        const onInterval = lastAction==='Intervalo-Inicio';
         
         // Bloqueio de botões se não houver localização
         const isLocationMissing = !location;
+
+        const isEntryBlocked = isWorking || onInterval;
+        const isExitBlocked = !isWorking || onInterval;
+        const isIntStartBlocked = !isWorking || onInterval;
+        const isIntEndBlocked = !onInterval;
 
         return (
           <div className="min-h-screen flex flex-col bg-white">
@@ -374,8 +380,8 @@
               </div>
 
               <div className="grid grid-cols-2 gap-4 mt-2">
-                <button disabled={isLocationMissing} onClick={()=>startCamera('Intervalo-Inicio')} className="bg-white border border-gray-200 p-4 rounded-xl font-bold text-gray-600 text-sm hover:bg-gray-50 scale-click disabled:opacity-50">Início Interv.</button>
-                <button disabled={isLocationMissing} onClick={()=>startCamera('Intervalo-Fim')} className="bg-white border border-gray-200 p-4 rounded-xl font-bold text-gray-600 text-sm hover:bg-gray-50 scale-click disabled:opacity-50">Fim Interv.</button>
+                <button disabled={isIntStartBlocked || isLocationMissing} onClick={()=>startCamera('Intervalo-Inicio')} className="bg-white border border-gray-200 p-4 rounded-xl font-bold text-gray-600 text-sm hover:bg-gray-50 scale-click disabled:opacity-50">Início Interv.</button>
+                <button disabled={isIntEndBlocked || isLocationMissing} onClick={()=>startCamera('Intervalo-Fim')} className="bg-white border border-gray-200 p-4 rounded-xl font-bold text-gray-600 text-sm hover:bg-gray-50 scale-click disabled:opacity-50">Fim Interv.</button>
               </div>
             </div>
 
