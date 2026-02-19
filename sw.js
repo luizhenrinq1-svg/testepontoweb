@@ -5,14 +5,15 @@
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
-// Configuração do Firebase
+// Configuração do Firebase (ATUALIZADA)
 const firebaseConfig = {
-  apiKey: "AIzaSyCn89LRlH1lksZ811--jb2jlB2iZS5NH1s",
-  authDomain: "pontoweb-dc8dd.firebaseapp.com",
-  projectId: "pontoweb-dc8dd",
-  storageBucket: "pontoweb-dc8dd.firebasestorage.app",
-  messagingSenderId: "465750633035",
-  appId: "1:465750633035:web:282efd14b807e2a3823bce"
+  apiKey: "AIzaSyCqq447JT58S_zQNKL0jz6eZTVKRK69TCE",
+  authDomain: "pontoweb-54c7d.firebaseapp.com",
+  projectId: "pontoweb-54c7d",
+  storageBucket: "pontoweb-54c7d.firebasestorage.app",
+  messagingSenderId: "287775717012",
+  appId: "1:287775717012:web:342536a3403a47fdf3e681",
+  measurementId: "G-SPSZRR73MX"
 };
 
 // Inicializa Firebase no Service Worker
