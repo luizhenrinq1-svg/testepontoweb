@@ -1,11 +1,11 @@
 /**
  * Service Worker para PontoWeb - PWA e Firebase
- * Versão: Correção de Links e Alinhamento de Projeto (V10.0)
+ * Versão: Correção de PWA (Adicionado Fetch) (V10.1)
  */
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
-// Configuração do Firebase (Sincronizada com o projeto pontoweb-dc8dd)
+// Configuração do Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyCn89LRlH1lksZ811--jb2jlB2iZS5NH1s",
   authDomain: "pontoweb-dc8dd.firebaseapp.com",
@@ -15,13 +15,13 @@ const firebaseConfig = {
   appId: "1:465750633035:web:282efd14b807e2a3823bce"
 };
 
-// Inicializa o Firebase no contexto do Service Worker
+// Inicializa o Firebase
 try {
   firebase.initializeApp(firebaseConfig);
   const messaging = firebase.messaging();
   console.log('[sw.js] Firebase inicializado com sucesso.');
 
-  // === LÓGICA DE SEGUNDO PLANO (BACKGROUND) ===
+  // Lógica de Segundo Plano (Background)
   messaging.onBackgroundMessage((payload) => {
     console.log('[sw.js] Mensagem recebida em segundo plano:', payload);
     
@@ -36,7 +36,7 @@ try {
       requireInteraction: true,
       tag: 'ponto-notification',
       data: {
-        url: 'https://sistemas-luiz.github.io/PontoWeb/' // URL oficial de produção
+        url: 'https://sistemas-luiz.github.io/PontoWeb/' 
       }
     };
 
@@ -46,23 +46,20 @@ try {
   console.error('[sw.js] Erro ao inicializar o Firebase:', e);
 }
 
-// === LÓGICA DE CLIQUE NA NOTIFICAÇÃO ===
+// Lógica de Clique na Notificação
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   
-  // Define o link de destino (utiliza a URL enviada ou o domínio oficial como recurso de salvaguarda)
   const urlToOpen = event.notification.data?.url || 'https://sistemas-luiz.github.io/PontoWeb/';
 
   event.waitUntil(
     clients.matchAll({type: 'window', includeUncontrolled: true}).then(windowClients => {
-      // 1. Tenta localizar uma aba existente que já esteja no domínio oficial
       for (var i = 0; i < windowClients.length; i++) {
         var client = windowClients[i];
         if (client.url.includes("sistemas-luiz.github.io/PontoWeb") && 'focus' in client) {
           return client.focus();
         }
       }
-      // 2. Se nenhuma aba for encontrada, abre uma nova com o endereço correto
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen);
       }
@@ -70,6 +67,17 @@ self.addEventListener('notificationclick', function(event) {
   );
 });
 
-// === ATIVAÇÃO IMEDIATA DO PWA ===
+// === ATIVAÇÃO DO PWA ===
 self.addEventListener('install', (event) => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+
+// === FETCH EVENT (OBRIGATÓRIO PARA A INSTALAÇÃO DO PWA) ===
+// Sem este evento, o Chrome não reconhece o app como instalável.
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    fetch(event.request).catch(() => {
+      // Retorna resposta de fallback offline se a rede falhar, caso aplicável futuramente.
+      return caches.match(event.request);
+    })
+  );
+});
