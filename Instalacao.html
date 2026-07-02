@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Instalar PontoWeb</title>
     
-    <!-- PWA Setup (Padrão Mobile - será trocado via JS se for PC) -->
+    <!-- PWA Setup (Inicia vazio para ser injetado dinamicamente via JS de forma ultra-confiável) -->
     <link id="manifest-link" rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#166534">
     <link rel="apple-touch-icon" href="https://github.com/sistemas-luiz/PontoWeb/blob/main/Icone.png?raw=true">
@@ -24,18 +24,39 @@
         .story-nav-area { -webkit-tap-highlight-color: transparent; }
     </style>
 
-    <!-- DETECÇÃO DE DISPOSITIVO E CONFIGURAÇÃO -->
+    <!-- DETECÇÃO DE DISPOSITIVO E CONFIGURAÇÃO ROBUSTA -->
     <script>
         (function() {
-            // Verifica se é dispositivo móvel
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            // 1. Detecção por User Agent clássico
+            const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
-            // Se NÃO for mobile (ou seja, é PC), troca o manifesto para a versão PC
-            if (!isMobile) {
-                console.log("Modo Desktop Detectado: Configurando instalação para PC...");
+            // 2. Detecção de iPads modernos rodando iPadOS (que se passam por MacOS de mesa)
+            const isIPadOS = (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            
+            // 3. Detecção baseada em toque na tela + tamanho da tela física do dispositivo
+            const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            const isSmallScreen = window.innerWidth <= 1024; // Limite de 1024px para cobrir tablets em pé/deitados e celulares
+            
+            // Decisão unificada e ultra-confiável:
+            // É mobile se o User Agent confirmar, se for iPadOS, ou se possuir tela de toque e tamanho de tela menor ou igual a 1024px
+            const isMobile = isMobileUA || isIPadOS || (isTouchDevice && isSmallScreen);
+            
+            // Salva as variáveis no escopo global (window) para sincronizar perfeitamente com os scripts do corpo (body)
+            window.isDeviceMobile = isMobile;
+            window.isDeviceIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || isIPadOS;
+
+            // Define o manifesto correto
+            const manifestHref = isMobile ? 'manifest.json' : 'manifest_pc.json';
+            
+            // Aplica dinamicamente na tag link do manifesto
+            document.addEventListener("DOMContentLoaded", function() {
                 const manifest = document.getElementById('manifest-link');
-                manifest.setAttribute('href', 'manifest_pc.json'); // Aponta para o manifesto que abre o index_pc.html
-            }
+                if (manifest) {
+                    manifest.setAttribute('href', manifestHref);
+                    console.log("Dispositivo Identificado como: " + (isMobile ? "Celular/Tablet" : "Computador"));
+                    console.log("Manifesto Aplicado com Sucesso: " + manifestHref);
+                }
+            });
         })();
     </script>
 </head>
@@ -165,9 +186,10 @@
     </div>
 
     <script>
-        // 1. Configuração de Links com base no Dispositivo
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        // 1. Configuração de Links com base no Dispositivo (Consumindo a detecção robusta unificada executada no HEAD)
+        const isMobile = window.isDeviceMobile;
+        const isIos = window.isDeviceIos;
+        
         const openAppBtn = document.getElementById('openAppBtn');
         const deviceText = document.getElementById('deviceText');
         const installBtnText = document.getElementById('installBtnText');
@@ -176,6 +198,7 @@
         if (isMobile) {
             openAppBtn.href = "https://sistemas-luiz.github.io/PontoWeb/index.html";
             deviceText.textContent = "Instale o app no seu celular para acesso rápido.";
+            installBtnText.textContent = "Instalar Aplicativo";
         } else {
             openAppBtn.href = "https://sistemas-luiz.github.io/PontoWeb/index_pc.html";
             deviceText.textContent = "Instale a versão Desktop no seu computador.";
