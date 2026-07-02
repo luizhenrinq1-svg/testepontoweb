@@ -1,22 +1,40 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-PT">
   <head>
     <base target="_top">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PontoWeb Unespar</title>
     
+    <!-- DETEÇÃO DE DISPOSITIVO E REDIRECIONAMENTO DE SEGURANÇA -->
+    <script>
+      (function() {
+        // 1. Deteção por User Agent clássico
+        const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // 2. Deteção de iPads modernos com iPadOS (que fingem ser MacOS)
+        const isIPadOS = (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        
+        // 3. Deteção baseada em toque + tamanho físico do ecrã
+        const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        const isSmallScreen = window.innerWidth <= 1024;
+        
+        const isMobile = isMobileUA || isIPadOS || (isTouchDevice && isSmallScreen);
+
+        // Se for detetado um PC a aceder a este ficheiro móvel (index.html), redireciona imediatamente para a versão de PC
+        if (!isMobile) {
+          window.location.replace("index_pc.html" + window.location.search);
+        }
+      })();
+    </script>
+    
     <!-- PWA Setup -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#166534">
-    <!-- ATUALIZADO: Usando o padrão mobile-web-app-capable correto e atual -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <!-- Ícone do App -->
     <link rel="apple-touch-icon" href="https://github.com/sistemas-luiz/PontoWeb/blob/main/Icone.png?raw=true">
-    
-    <!-- Fallback para evitar erro de favicon 404 -->
     <link rel="icon" type="image/png" href="https://github.com/sistemas-luiz/PontoWeb/blob/main/Icone.png?raw=true">
 
     <!-- Dependências -->
@@ -29,7 +47,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 
     <style>
-      /* FUNDO BRANCO E TIPOGRAFIA */
       body { 
         background-color: #ffffff; 
         color: #1f2937; 
@@ -38,7 +55,6 @@
         -webkit-tap-highlight-color: transparent; 
       }
       
-      /* ANIMAÇÕES DE FLUIDEZ */
       .fade-in { animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
       @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       
@@ -50,7 +66,6 @@
       .spinner { border: 3px solid #e5e7eb; width: 24px; height: 24px; border-radius: 50%; border-left-color: #16a34a; animation: spin 0.8s linear infinite; }
       @keyframes spin { 100% { transform: rotate(360deg); } }
       
-      /* Animação de pulso suave para o GPS */
       .pulse-dot { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
       @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
     </style>
@@ -113,7 +128,7 @@
       }
     </script>
 
-    <!-- REACT APP LOGIC (Isolado de interpretadores estáticos externos) -->
+    <!-- LÓGICA DA APLICAÇÃO REACT -->
     <script type="text/plain" id="react-app">
       const { useState, useEffect, useRef, useMemo } = React;
       
@@ -121,7 +136,6 @@
       const CACHE_KEY_NOTIF = 'pontoWebConfig';
       const CACHE_KEY_DATA = 'pontoweb_user_data_cache';
 
-      // --- ÍCONES OTIMIZADOS ---
       const Icon = {
         Map: (props) => <svg className={`w-4 h-4 ${props.className || ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
         Camera: (props) => <svg className={`w-6 h-6 ${props.className || ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
@@ -138,7 +152,6 @@
         Settings: (props) => <svg className={`w-6 h-6 ${props.className || ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
       };
 
-      // --- APP COMPONENT ---
       function TimeClock({ onBack }) {
         const [authData] = useState(() => JSON.parse(localStorage.getItem(CACHE_KEY_AUTH) || 'null'));
         const [cachedData] = useState(() => JSON.parse(localStorage.getItem(CACHE_KEY_DATA) || 'null'));
@@ -195,13 +208,13 @@
           if (deferredPrompt) { deferredPrompt.prompt(); const {outcome}=await deferredPrompt.userChoice; if(outcome==='accepted') setDeferredPrompt(null); return; }
           const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
           if (isIos) setIosHelp(true);
-          else alert("App já instalado ou não suportado. Tente pelo menu do navegador.");
+          else alert("App já instalado ou não suportado. Tente através do menu do navegador.");
         };
 
         const openNotificationsExternal = () => {
            if (params && params.id && params.token) {
               window.open(`https://sistemas-luiz.github.io/notificacoes/?id=${params.id}&token=${params.token}`, '_blank');
-           } else { alert("Aguarde a identificação do usuário."); }
+           } else { alert("Aguarde a identificação do utilizador."); }
         };
 
         useEffect(() => {
@@ -250,12 +263,10 @@
                  setStatus('ready');
                }
              }).withFailureHandler(err => { 
-                if(!cachedData) { alert("Erro conexão."); setStatus('waiting_link'); }
+                if(!cachedData) { alert("Erro de ligação."); setStatus('waiting_link'); }
              }).getBolsistaInfo(id,token);
            } else if(!cachedData) {
              setStatus('error-offline');
-           } else {
-             // Mantém mostrando dados mesmo em cache offline
            }
         };
 
@@ -267,7 +278,7 @@
 
         const resetState = () => { setResult(null); setPunchType(null); setStatus('ready'); if (params) loadBolsistaBackground(params.id, params.token); };
         
-        const startCamera = async (type) => { setPunchType(type); setStatus('punching'); try { const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}}); if(videoRef.current) videoRef.current.srcObject=s; } catch(e) { alert('Câmera necessária.'); setStatus('ready'); } };
+        const startCamera = async (type) => { setPunchType(type); setStatus('punching'); try { const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}}); if(videoRef.current) videoRef.current.srcObject=s; } catch(e) { alert('Acesso à câmara é necessário.'); setStatus('ready'); } };
         
         const confirm = () => {
           if(!navigator.onLine) { alert("Offline."); setStatus('ready'); return; }
@@ -286,19 +297,19 @@
                localStorage.setItem(CACHE_KEY_DATA,JSON.stringify(c)); 
                applyUserData(c);
              } else { alert("Erro: "+res.msg); setStatus('ready'); } 
-          }).withFailureHandler(err => { alert("Erro servidor."); setStatus('ready'); }).registrarPonto(pl);
+          }).withFailureHandler(err => { alert("Erro no servidor."); setStatus('ready'); }).registrarPonto(pl);
         };
 
-        if(status==='waiting_link') return <div className="h-screen flex items-center justify-center p-4 bg-white"><form onSubmit={handleManualLogin} className="w-full max-w-sm text-center fade-in"><div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600"><Icon.Link/></div><h1 className="text-xl font-bold mb-2 text-gray-800">Identificação</h1><p className="text-gray-500 mb-6 text-sm">Cole seu link pessoal para acessar.</p><input value={inputUrl} onChange={e=>setInputUrl(e.target.value)} placeholder="Cole aqui..." className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-green-500 outline-none"/><button className="bg-green-600 text-white w-full py-3 rounded-lg font-bold shadow-lg scale-click">Entrar</button></form></div>;
+        if(status==='waiting_link') return <div className="h-screen flex items-center justify-center p-4 bg-white"><form onSubmit={handleManualLogin} className="w-full max-w-sm text-center fade-in"><div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600"><Icon.Link/></div><h1 className="text-xl font-bold mb-2 text-gray-800">Identificação</h1><p className="text-gray-500 mb-6 text-sm">Cole o seu link pessoal para aceder.</p><input value={inputUrl} onChange={e=>setInputUrl(e.target.value)} placeholder="Cole aqui..." className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-green-500 outline-none"/><button className="bg-green-600 text-white w-full py-3 rounded-lg font-bold shadow-lg scale-click">Entrar</button></form></div>;
         if(status==='loading') return (
           <div className="h-screen flex flex-col items-center justify-center bg-white gap-4">
             <img src="https://github.com/sistemas-luiz/PontoWeb/blob/main/Logo.png?raw=true" className="w-48 h-48 animate-pulse" />
             <div className="spinner"></div>
           </div>
         );
-        if(status==='error-offline') return <div className="h-screen flex items-center justify-center flex-col gap-4 bg-white text-center p-6"><h2 className="text-xl font-bold text-red-600">Sem Conexão</h2><p className="text-gray-500">Conecte-se para carregar seus dados.</p><button onClick={()=>window.location.reload()} className="bg-gray-100 px-6 py-2 rounded-lg font-bold">Tentar Novamente</button></div>;
+        if(status==='error-offline') return <div className="h-screen flex items-center justify-center flex-col gap-4 bg-white text-center p-6"><h2 className="text-xl font-bold text-red-600">Sem Conexão</h2><p className="text-gray-500">Ligue-se à internet para carregar os seus dados.</p><button onClick={()=>window.location.reload()} className="bg-gray-100 px-6 py-2 rounded-lg font-bold">Tentar Novamente</button></div>;
         
-        if(status==='success') return <div className="h-screen flex flex-col items-center justify-center gap-4 bg-white fade-in"><div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600"><Icon.Check/></div><h2 className="text-2xl font-bold text-gray-800">Registrado!</h2><p className="text-gray-500 text-lg">{result.timestamp}</p><button onClick={resetState} className="mt-8 bg-gray-100 text-gray-700 px-8 py-3 rounded-full font-bold scale-click">Voltar</button></div>;
+        if(status==='success') return <div className="h-screen flex flex-col items-center justify-center gap-4 bg-white fade-in"><div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600"><Icon.Check/></div><h2 className="text-2xl font-bold text-gray-800">Registado!</h2><p className="text-gray-500 text-lg">{result.timestamp}</p><button onClick={resetState} className="mt-8 bg-gray-100 text-gray-700 px-8 py-3 rounded-full font-bold scale-click">Voltar</button></div>;
         
         if(status==='punching') return (
           <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50 slide-up">
@@ -307,7 +318,7 @@
               <button onClick={()=>{if(videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t=>t.stop()); setStatus('ready');}} className="flex-1 bg-white py-4 rounded-xl font-bold text-gray-800 shadow-lg scale-click">Cancelar</button>
               <button onClick={confirm} className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 scale-click"><Icon.Camera className="w-5 h-5"/> Confirmar</button>
             </div>
-            <div className="absolute top-10 bg-black/40 backdrop-blur-md text-white font-bold text-sm px-4 py-2 rounded-full">A registrar {punchType}</div>
+            <div className="absolute top-10 bg-black/40 backdrop-blur-md text-white font-bold text-sm px-4 py-2 rounded-full">A registar {punchType}</div>
           </div>
         );
 
@@ -338,17 +349,17 @@
               <div className="mt-1 opacity-90 text-xs font-medium uppercase tracking-widest">Unespar</div>
               
               <div className="mt-6 mb-2">
-                <span className="text-5xl font-mono font-bold tracking-tighter drop-shadow-sm">{currentTime.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span>
+                <span className="text-5xl font-mono font-bold tracking-tighter drop-shadow-sm">{currentTime.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})}</span>
                 <span className="text-xl font-mono font-medium opacity-80 ml-1">{currentTime.getSeconds().toString().padStart(2,'0')}</span>
               </div>
-              <div className="text-sm font-medium opacity-90 mb-4">{currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+              <div className="text-sm font-medium opacity-90 mb-4">{currentTime.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
 
               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-green-700/40 rounded-full text-xs font-medium backdrop-blur-sm">
-                 <Icon.Map className="w-3 h-3"/> {location ? 'Localização Ativa' : 'Buscando GPS...'}
+                 <Icon.Map className="w-3 h-3"/> {location ? 'Localização Ativa' : 'A procurar GPS...'}
               </div>
             </div>
 
-            {status==='sending'&&<div className="absolute inset-0 bg-white/90 z-50 flex flex-col items-center justify-center backdrop-blur-sm fade-in"><div className="spinner mb-4"></div><p className="text-green-700 font-bold animate-pulse">Enviando dados...</p></div>}
+            {status==='sending'&&<div className="absolute inset-0 bg-white/90 z-50 flex flex-col items-center justify-center backdrop-blur-sm fade-in"><div className="spinner mb-4"></div><p className="text-green-700 font-bold animate-pulse">A enviar dados...</p></div>}
             
             <div className="flex-1 p-6 flex flex-col justify-center gap-4 fade-in">
               <div className="text-center mb-4">
@@ -386,7 +397,7 @@
                  </div>
                </div>
                <span className="text-[10px] text-gray-400 leading-tight max-w-[280px] inline-block">
-                 Este aplicativo atende e respeita as normas da Política de Privacidade e Proteção de Dados (LGPD).
+                 Esta aplicação cumpre e respeita as normas da Política de Privacidade e Proteção de Dados (RGPD/LGPD).
                </span>
                <div className="text-[9px] text-gray-300 mt-2 font-mono">Versão 5.0 (Offline Ready)</div>
             </div>
@@ -394,7 +405,6 @@
         );
       }
 
-      // --- LANDING PAGE ---
       function LandingPage({ onOpenWeb }) {
         const [deferredPrompt, setDeferredPrompt] = useState(null);
         const [iosHelp, setIosHelp] = useState(false);
@@ -408,7 +418,7 @@
           if (deferredPrompt) { deferredPrompt.prompt(); const {outcome}=await deferredPrompt.userChoice; if(outcome==='accepted') setDeferredPrompt(null); return; }
           const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
           if (isIos) setIosHelp(true);
-          else alert("Use o menu do navegador > Instalar aplicativo.");
+          else alert("Use o menu do navegador > Instalar aplicação.");
         };
 
         return (
@@ -418,14 +428,14 @@
             <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center shadow-xl mb-6 bounce z-10"><img src="https://github.com/sistemas-luiz/PontoWeb/blob/main/Logo.png?raw=true" className="w-14 h-14"/></div>
             
             <h1 className="text-3xl font-bold text-gray-800 mb-2">PontoWeb</h1>
-            <p className="text-gray-500 mb-8 max-w-xs text-sm">Registro de frequência.</p>
+            <p className="text-gray-500 mb-8 max-w-xs text-sm">Registo de presença de bolsistas.</p>
 
             <div className="w-full max-w-sm space-y-3 mb-8">
                <button onClick={install} className="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 hover:bg-green-700 active:scale-95 transition-all">
                  <Icon.Download className="w-6 h-6"/> Instalar App
                </button>
                <button onClick={onOpenWeb} className="w-full bg-gray-50 text-green-700 py-3 rounded-xl font-bold text-sm hover:bg-gray-100 active:scale-95 transition-all">
-                 Acessar sem instalar
+                 Aceder sem instalar
                </button>
             </div>
 
@@ -434,8 +444,8 @@
                  <div className="bg-white p-6 rounded-2xl w-full max-w-sm relative text-left" onClick={e=>e.stopPropagation()}>
                     <button onClick={()=>setIosHelp(false)} className="absolute top-4 right-4 text-gray-400">✕</button>
                     <h3 className="font-bold text-lg mb-4 text-gray-800">Instalar no iPhone</h3>
-                    <p className="text-sm text-gray-600 mb-2">1. Toque em <strong>Compartilhar</strong> <Icon.Share className="inline w-4 h-4 text-blue-500"/></p>
-                    <p className="text-sm text-gray-600 mb-2">2. Selecione <strong>Adicionar ao Ecrã Principal</strong></p>
+                    <p className="text-sm text-gray-600 mb-2">1. Toque em <strong>Partilhar</strong> <Icon.Share className="inline w-4 h-4 text-blue-500"/></p>
+                    <p className="text-sm text-gray-600 mb-2">2. Selecione <strong>Ecrã Principal</strong></p>
                     <p className="text-sm text-gray-600">3. Toque em <strong>Adicionar</strong></p>
                  </div>
               </div>
@@ -462,31 +472,23 @@
       root.render(<Main />);
     </script>
 
-    <!-- Dinamic Transpiler Bootstrapper (Compatibilidade com Canvas e Navegadores modernos) -->
+    <!-- Transpiler Bootstrapper -->
     <script>
       window.addEventListener('DOMContentLoaded', () => {
         try {
           const reactAppEl = document.getElementById('react-app');
           if (reactAppEl) {
             const rawCode = reactAppEl.textContent;
-            
-            // ATUALIZADO: Configurado o preset 'react' para usar o runtime 'classic'
-            // Isso evita injeções de 'import' do React 17+ automático e gera JavaScript ES5 limpo
             const compiledCode = Babel.transform(rawCode, { 
               presets: [
                 ['react', { runtime: 'classic' }]
               ] 
             }).code;
-            
-            // Executa o código em um escopo isolado na memória,
-            // contornando totalmente o interceptor de DOM (transformScriptTags.ts) do Canvas.
             const executeApp = new Function(compiledCode);
             executeApp();
           }
         } catch (err) {
-          console.error("Erro na compilação ou execução do React:", err);
-          
-          // Fallback final caso o ambiente force a injeção
+          console.error("Erro ao inicializar o React:", err);
           try {
              const reactAppEl = document.getElementById('react-app');
              if (reactAppEl) {
@@ -506,7 +508,7 @@
                rootEl.innerHTML = `
                  <div style="padding: 24px; text-align: center; font-family: sans-serif; color: #dc2626; max-width: 400px; margin: 40px auto; border: 1px solid #fca5a5; border-radius: 12px; background: #fef2f2;">
                    <h3 style="font-weight: bold; font-size: 18px; margin-bottom: 8px;">Falha ao Carregar</h3>
-                   <p style="font-size: 14px; color: #4b5563; margin-bottom: 16px;">Ocorreu um problema ao inicializar o App.</p>
+                   <p style="font-size: 14px; color: #4b5563; margin-bottom: 16px;">Ocorreu um problema ao inicializar a App.</p>
                    <pre style="text-align: left; background: #ffffff; padding: 12px; border-radius: 8px; font-size: 12px; border: 1px solid #e5e7eb; overflow-x: auto; font-family: monospace;">${err.message}</pre>
                  </div>
                `;
