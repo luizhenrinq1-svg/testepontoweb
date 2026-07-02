@@ -1,13 +1,13 @@
 {
-  "name": "PontoWeb Unespar",
+  "name": "PontoWeb Unespar (PC)",
   "short_name": "PontoWeb",
-  "description": "Sistema de registo e controlo de ponto para a Unespar.",
-  "start_url": "./index.html",
+  "description": "Sistema de registo e controlo de ponto para a Unespar (Versão Desktop).",
+  "start_url": "./index_pc.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f0fdf4",
+  "background_color": "#eef2f6",
   "theme_color": "#166534",
-  "orientation": "portrait",
+  "orientation": "landscape",
   "icons": [
     {
       "src": "https://github.com/sistemas-luiz/PontoWeb/blob/main/Icone.png?raw=true",
